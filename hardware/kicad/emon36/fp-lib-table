@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name "emon36")(type "KiCad")(uri "${KIPRJMOD}/emon36.pretty")(options "")(descr ""))
+)
