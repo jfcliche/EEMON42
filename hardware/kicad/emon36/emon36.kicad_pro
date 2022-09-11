@@ -416,7 +416,7 @@
       "model_mode": 0,
       "workbook_filename": ""
     },
-    "page_layout_descr_file": "",
+    "page_layout_descr_file": "empty.kicad_wks",
     "plot_directory": "",
     "spice_adjust_passive_values": false,
     "spice_external_command": "spice \"%I\"",
@@ -447,6 +447,10 @@
     [
       "0df4bc5b-b94b-4666-9a32-0a0c546ba1f1",
       "CH5"
+    ],
+    [
+      "2a53fb3c-728b-4041-b6fb-ef087553b4f0",
+      "CH7"
     ],
     [
       "40f69fab-f296-4551-8c4e-2b8570970db0",

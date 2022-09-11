@@ -1,3 +1,5 @@
 (sym_lib_table
   (lib (name "emon36")(type "KiCad")(uri "${KIPRJMOD}/emon36.kicad_sym")(options "")(descr ""))
+  (lib (name "emon32old")(type "KiCad")(uri "${KIPRJMOD}/emon36-2.kicad_sym")(options "")(descr ""))
+  (lib (name "emon36-eagle-import")(type "KiCad")(uri "${KIPRJMOD}/emon36-eagle-import.kicad_sym")(options "")(descr ""))
 )

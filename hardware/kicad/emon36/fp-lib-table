@@ -1,3 +1,8 @@
 (fp_lib_table
   (lib (name "emon36")(type "KiCad")(uri "${KIPRJMOD}/emon36.pretty")(options "")(descr ""))
+  (lib (name "Button_Switch_SMD")(type "KiCad")(uri "${KIPRJMOD}/emon36.pretty/Button_Switch_SMD.pretty")(options "")(descr ""))
+  (lib (name "Capacitor_SMD")(type "KiCad")(uri "${KIPRJMOD}/emon36.pretty/Capacitor_SMD.pretty")(options "")(descr ""))
+  (lib (name "Connector_Audio")(type "KiCad")(uri "${KIPRJMOD}/emon36.pretty/Connector_Audio.pretty")(options "")(descr ""))
+  (lib (name "Package_DFN_QFN")(type "KiCad")(uri "${KIPRJMOD}/emon36.pretty/Package_DFN_QFN.pretty")(options "")(descr ""))
+  (lib (name "Resistor_SMD")(type "KiCad")(uri "${KIPRJMOD}/emon36.pretty/Resistor_SMD.pretty")(options "")(descr ""))
 )

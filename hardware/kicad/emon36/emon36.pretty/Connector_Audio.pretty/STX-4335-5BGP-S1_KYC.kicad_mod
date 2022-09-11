@@ -1,11 +1,11 @@
 (footprint "STX-4335-5BGP-S1_KYC" (version 20211014) (generator pcbnew)
   (layer "F.Cu")
   (tedit 0)
-  (fp_text reference "REF**" (at 8.784123 -11.666604 -90 unlocked) (layer "F.SilkS")
+  (fp_text reference "REF**" (at -6.985 16.51 unlocked) (layer "F.SilkS")
     (effects (font (size 1.524 1.524) (thickness 0.254)) (justify left bottom))
     (tstamp 59766fe1-ae9e-4d26-b6bc-32c8fb32bb00)
   )
-  (fp_text value "STX-4335-5BGP-S1" (at 181.252102 55.030098 -90 unlocked) (layer "F.SilkS") hide
+  (fp_text value "STX-4335-5BGP-S1" (at -8.255 13.335 90 unlocked) (layer "F.SilkS") hide
     (effects (font (size 1.524 1.524) (thickness 0.254)) (justify left bottom))
     (tstamp ce597dfd-de33-4262-95d8-df0d95497a6b)
   )
