@@ -1,0 +1,18 @@
+(footprint "STX-4335_Combined_Mounting_Hole" (version 20211014) (generator pcbnew)
+  (layer "F.Cu")
+  (tedit 0)
+  (attr through_hole)
+  (fp_text reference "REF**" (at 0.3 -2.1 unlocked) (layer "F.SilkS")
+    (effects (font (size 1 1) (thickness 0.15)))
+    (tstamp 4a9ef967-3fb8-4388-b278-0a3bce51c2d4)
+  )
+  (fp_text value "STX-4335_Combined_Mounting_Hole" (at 0 1 unlocked) (layer "F.Fab") hide
+    (effects (font (size 1 1) (thickness 0.15)))
+    (tstamp 5dd86e48-5ddf-44d4-81eb-f89341bad9b0)
+  )
+  (fp_text user "${REFERENCE}" (at 0 2.5 unlocked) (layer "F.Fab") hide
+    (effects (font (size 1 1) (thickness 0.15)))
+    (tstamp 12f90ccb-ddbc-4915-a67b-9565eef2abf7)
+  )
+  (pad "M4" thru_hole oval (at 0 0) (size 3.6 3.2194) (drill oval 2.6 2.3114) (layers *.Cu *.Mask) (tstamp c2453a9e-4173-4154-847c-38a2585fd9ca))
+)

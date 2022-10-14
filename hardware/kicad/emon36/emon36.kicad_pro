@@ -416,7 +416,7 @@
       "model_mode": 0,
       "workbook_filename": ""
     },
-    "page_layout_descr_file": "empty.kicad_wks",
+    "page_layout_descr_file": "emon36.kicad_wks",
     "plot_directory": "",
     "spice_adjust_passive_values": false,
     "spice_external_command": "spice \"%I\"",
@@ -433,27 +433,27 @@
       "CH1"
     ],
     [
-      "54d51a68-fdb0-4239-9ee9-a34f0623b2b3",
+      "5b2fcc22-61f7-41e8-82ee-e13c6bd19931",
       "CH2"
     ],
     [
-      "02f8b3bd-3ba3-4775-9f27-36281352feff",
+      "8e0c6e34-4e21-40f1-86d3-ea52cf55e783",
       "CH3"
     ],
     [
-      "20d371ed-0072-4b60-bec1-d33a7ce2412d",
+      "fbdbc667-2656-4359-b744-547f1661402b",
       "CH4"
     ],
     [
-      "0df4bc5b-b94b-4666-9a32-0a0c546ba1f1",
+      "fd35300f-3151-44f4-802b-3e6a65a40b3c",
       "CH5"
     ],
     [
-      "2a53fb3c-728b-4041-b6fb-ef087553b4f0",
-      "CH7"
+      "32fb935b-2439-4a65-a08c-2d4571795e5c",
+      "CH6"
     ],
     [
-      "40f69fab-f296-4551-8c4e-2b8570970db0",
+      "a88d8da6-df06-417d-9b24-79e7c14524f9",
       "CH0"
     ]
   ],
