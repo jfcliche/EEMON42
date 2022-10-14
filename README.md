@@ -3,24 +3,28 @@ ESP32-C3-based 36-channel home energy monitor
 
 Features
 
-  - 36 Current Transformer inputs (3.5 mm jacks)
-  - Accurate Energy monitoring performed by six ADE7816
-  - ESP32-C3-WROOM-02 module (RISC-V single core controller, 4 MB flash, Wifi, Bluetooth)
-  - PMOD to support Digilent OLED display
-  - 6 key keypad
-  - Single phase or split-phase 9 VAC inputs for voltage monitoring (jumper selected)
-  - Micro-USB connector for UART programming and JTAG debugging (using the ESP32 embedded USB controller)      
-  - Powered by the 9VAC input or the USB port
+  - 36 (42) Current Transformer inputs with 3.5 mm jacks
+  - Accurate Energy monitoring performed by six (seven) ADE7816
+  - ESP32-C3 controller implemented with a ESP32-C3-WROOM-02 or ESP-C3-13 module, providing 
+      - Single core RISC-V 160 MHz processor
+      - 4 MB flash
+      - Wifi, Bluetooth
+      - Embedded USB controller
+  - 96x64 pixel, 0.96" OLED display
+  - 4-key + rotary encoder user controls
+  - Dual 9-15VAC inputs for line voltage monitoring and powering the board
+  - Micro-USB connector for UART programming and JTAG debugging, and alternate board powering      
+  - Integrated DC-DC converter
 
 # Rationale
 
-The EMON36 was developed as personal project to get familiarized with the tools required to build an embedded controller project. This includes:
+The EMON36 was developed as personal project for learning all the steps to build an embedded controller project from A to Z, starting from from schematics & layout, online PCB manufacturing, hand soldering of high density SMD devices, an developing the embedded controller software. This includes:
 
-   - KiCAD 6.0 (I have designed and verified many boards with Altium but never did the routing myself before)
-   - Manufacturing using cheap online PCB prototyping fabs (never done that before)
-   - Home-made assembly of boards with high density chips (Have done some SMT reworks, but not full assemblies)
-   - ESP32-C3-based module (first time with this processor; last time was with a 68HC11 20 years ago)
-   - Software development tools (Visual Studio Code / Platform IO / ESP IDF etc)
+   - Learn KiCAD 6.0 (I have designed and verified many boards with Altium but never did the routing myself before)
+   - Use PCBWay or JLCPCB (never done that before)
+   - Solder QFN 0.5mm pitch devices (Have done some SMT reworks, but not full assemblies)
+   - Learn the internal architecture of the ESP32-C3-based module (first time with this processor; last time was with a 68HC11 20 years ago)
+   - Software development tools (Visual Studio Code / Platform IO / ESP IDF/ Micropython etc)
 
 # Status
 
