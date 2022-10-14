@@ -1,0 +1,10 @@
+# Ignore non-essential KiCAD files
+\#auto_saved_files\#
+*.snap
+*-backups/
+_autosave*
+old/
+*.bak
+*.log
+*.kicad_sch-bak
+production/
