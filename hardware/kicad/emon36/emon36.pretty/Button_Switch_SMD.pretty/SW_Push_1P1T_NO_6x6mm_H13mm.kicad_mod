@@ -34,9 +34,9 @@
   (fp_line (start 3 -3) (end -3 -3) (layer "F.Fab") (width 0.1) (tstamp c73e2675-f731-42aa-8d59-b2f5dabd6047))
   (fp_circle (center 0 0) (end 1.75 -0.05) (layer "F.Fab") (width 0.1) (fill none) (tstamp b5b8535f-b68b-4903-bd7a-b5931fc607f4))
   (pad "1" smd rect (at -3.975 -2.25) (size 1.55 1.3) (layers "F.Cu" "F.Paste" "F.Mask") (tstamp 724eef5c-a7f9-4b46-8600-7e1e51574c63))
-  (pad "1" smd rect (at 3.975 -2.25) (size 1.55 1.3) (layers "F.Cu" "F.Paste" "F.Mask") (tstamp 9f0cd8cc-3b0f-430b-b686-53fc15858e38))
-  (pad "2" smd rect (at -3.975 2.25) (size 1.55 1.3) (layers "F.Cu" "F.Paste" "F.Mask") (tstamp 5d34494a-bae9-41c4-9fd4-f627643edc40))
-  (pad "2" smd rect (at 3.975 2.25) (size 1.55 1.3) (layers "F.Cu" "F.Paste" "F.Mask") (tstamp f086a8ce-1f26-4caf-9a4f-f8385e5acd55))
+  (pad "2" smd rect (at 3.975 -2.25) (size 1.55 1.3) (layers "F.Cu" "F.Paste" "F.Mask") (tstamp 9f0cd8cc-3b0f-430b-b686-53fc15858e38))
+  (pad "3" smd rect (at -3.975 2.25) (size 1.55 1.3) (layers "F.Cu" "F.Paste" "F.Mask") (tstamp 5d34494a-bae9-41c4-9fd4-f627643edc40))
+  (pad "4" smd rect (at 3.975 2.25) (size 1.55 1.3) (layers "F.Cu" "F.Paste" "F.Mask") (tstamp f086a8ce-1f26-4caf-9a4f-f8385e5acd55))
   (model "${KICAD6_3DMODEL_DIR}/Button_Switch_SMD.3dshapes/SW_PUSH_6mm_H9.5mm.wrl"
     (offset (xyz 0 0 0))
     (scale (xyz 1 1 1))
