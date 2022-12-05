@@ -5,7 +5,7 @@
   (paper "USLetter")
 
   (title_block
-    (title "EMON36 - 36-channel single-board energy monitor")
+    (title "EEMON42 - 42-channel single-board energy monitor")
     (rev "1.0")
     (company "JFCInc")
     (comment 1 "ADE7816 Energy Monitor device & connectors")
