@@ -2176,7 +2176,7 @@
     (property "Value" "ESP32-C3-WROOM-02-N4" (id 1) (at -12.7 -20.32 0)
       (effects (font (size 1.27 1.27)) (justify left bottom))
     )
-    (property "Footprint" "MODULE_ESP32-C3-WROOM-02-H4" (id 2) (at -19.05 24.13 0)
+    (property "Footprint" "emon36:MODULE_ESP32-C3-WROOM-02-H4" (id 2) (at -19.05 24.13 0)
       (effects (font (size 1.27 1.27)) (justify left bottom) hide)
     )
     (property "Datasheet" "" (id 3) (at 0 0 0)
