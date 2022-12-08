@@ -2701,7 +2701,7 @@
     (property "Value" "SSD1331_RGB_OLED_94x64" (id 1) (at 1.27 -12.7 0)
       (effects (font (size 1.27 1.27)))
     )
-    (property "Footprint" "emon36:SSD1331_RGB_OLED_96x64" (id 2) (at 2.54 -15.24 0)
+    (property "Footprint" "emon36:SSD1331_RGB_OLED_96x64" (id 2) (at 2.54 -14.605 0)
       (effects (font (size 1.27 1.27)) hide)
     )
     (property "Datasheet" "~" (id 3) (at 2.54 -3.81 0)
