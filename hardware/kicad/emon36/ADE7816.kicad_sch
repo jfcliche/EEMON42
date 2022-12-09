@@ -2980,7 +2980,7 @@
   (symbol (lib_id "Device:D_Schottky_Dual_CommonAnode_KKA_Parallel") (at 217.17 87.63 180) (unit 1)
     (in_bom yes) (on_board yes)
     (uuid 1a416d41-d0ef-4218-a56b-7ae8ea8a6155)
-    (property "Reference" "D8" (id 0) (at 219.71 83.82 0))
+    (property "Reference" "D12" (id 0) (at 219.71 83.82 0))
     (property "Value" "D_Schottky_Dual_CommonAnode_KKA_Parallel" (id 1) (at 216.8525 81.28 0)
       (effects (font (size 1.27 1.27)) hide)
     )
