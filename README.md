@@ -1,4 +1,4 @@
-# EMON42
+# EEMON42
 ESP32-C3-based 42-channel home energy monitor using the Analog Device ADE7816 emergy monitor chip
 
 Features
