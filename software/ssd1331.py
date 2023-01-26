@@ -1,82 +1,21 @@
-import pyftdi.spi
-import pyftdi.gpio
-import random
+# import pyftdi.spi
+# import pyftdi.gpio
+import random, time
 
 class SSD1331:
-    """ Interface to control the SPI and control lines of a SSD1331 display using the ESP-Prog FTDI board
+    """ Interface to control the SPI and control lines of a SSD1331 display"""
 
-    This class offers standardized read/write interface.
+    def __init__(self, spi, cs, cd, res):
+   
+        self.spi = spi
+        self.cs = cs
+        self.cd = cd
+        self.res = res
 
-    JTAG connector (configured as a SPI interface)
-        pin 1: VDD (set jumper to select 3.3V!)
-        pin 2: CS (TMS)
-        pin 4: SCK (TCK)
-        pin 6: MISO (TDO)
-        pin 8: MOSI (TDI)
-        pin 3,5,7,9 - GND
-
-    UART connector (configured ad GPIO)
-        pin 1: (EN): cannot use, see note
-        pin 2: VDD (set jumper to select 3.3V!)
-        pin 3: GPIO1- RES (TXD)
-        pin 4: GND
-        pin 5: GPIO0 - C/D  (RXD)
-        pin 6: (IO0): cannot use see note
-
-        NOTE: GPIO 2 & 4 must stay at 1 to enable EN, which enables JTAG connector outputs
-
-    """
-    DC_GPIO_MASK = 0b00001  # D/C# Data/command on GPIO0
-    RES_GPIO_MASK = 0b00010  # RES# on GPIO1
-    RTS_DTR_GPIO_MASK = 0b10100 # RTS and DTR bits, used to set EN and IO0
-
-    # From : https://github.com/adafruit/Adafruit_CircuitPython_SSD1331/blob/main/adafruit_ssd1331.py
-
-    _INIT_SEQUENCE = (
-        b"\xAE\x00"  # _DISPLAYOFF
-        b"\xA0\x01\x72"  # _SETREMAP (RGB)
-        b"\xA1\x01\x00"  # _STARTLINE
-        b"\xA2\x01\x00"  # _DISPLAYOFFSET
-        b"\xA4\x00"  # _NORMALDISPLAY
-        b"\xA8\x01\x3F"  # _SETMULTIPLEX (1/64 duty)
-        b"\xAD\x01\x8E"  # _SETMASTER
-        b"\xB0\x01\x0B"  # _POWERMODE
-        b"\xB1\x01\x31"  # _PRECHARGE
-        b"\xB3\x01\xF0"  # _CLOCKDIV 7:4 = Osc Freq, 3:0 = CLK Div Ratio
-        b"\x8A\x01\x64"  # _PRECHARGEA
-        b"\x8B\x01\x78"  # _PRECHARGEB
-        b"\x8C\x01\x64"  # _PRECHARGEC
-        b"\xBB\x01\x3A"  # _PRECHARGELEVEL
-        b"\xBE\x01\x3E"  # _VCOMH
-        b"\x87\x01\x06"  # _MASTERCURRENT
-        b"\x81\x01\x91"  # _CONTRASTA
-        b"\x82\x01\x50"  # _CONTRASTB
-        b"\x83\x01\x7D"  # _CONTRASTC
-        b"\xAF\x00"  # _DISPLAYON
-    )
-
-
-    def __init__(self, url1='ftdi://ftdi:2232h/1', url2='ftdi://ftdi:2232h/2', freq=10e6):
-
-        self.spi_ctrl = pyftdi.spi.SpiController()
-        self.spi_ctrl.configure(url1)
-
-        self.spi = self.spi_ctrl.get_port(cs=0, freq=freq, mode=0)
-
-        self.gpio = pyftdi.gpio.GpioAsyncController()
-        self.gpio.configure(url2)
-        self.gpio.set_direction(0xFF, 0xFF)  # all 8 bits of port BD are outputs
-
-        # reset the display by pulsing the reset line low
-        # self.gpio.write(self.RTS_DTR_GPIO_MASK) # DC=0, RES=0, RTS/DTR=1
-        # time.sleep(0.3)
-        # self.gpio.write(self.RTS_DTR_GPIO_MASK | self.RES_GPIO_MASK) # DC=0, RES=1, RTS/DTR=1
-
-
-        # Initialize the display
-        # self.write_command(self._INIT_SEQUENCE)
-        # self.write_command([0xAF,0])  # display ON
-        # self.write_command(b"\xA0\x01\x72")
+        self.res(0)
+        time.sleep(0.01)
+        self.res(1)
+        time.sleep(0.01)
 
         self.write_command([
             0xAE,        # Display off
@@ -98,27 +37,109 @@ class SSD1331:
         self.write_command([0xAF])  # display ON
 
         self.write_command([0x26, 1])  # Enable rectangle fill
-        # debug
-        rand = random.randint
-        while True:
-            self.write_command([0x21, rand(0,95), rand(0,63), rand(0,95), rand(0,63), rand(0,63), rand(0,63), rand(0,63)])
-            self.write_command([0x22,1,1,16,16, 35,0,0, 0,0,40])
-            # time.sleep(0.2)
-            self.write_command([0x22,1,1,16,16, 0,35,0, 0,40,0])
-            # time.sleep(0.2)
+
+
     def write_command(self, data):
         """ Writes data bytes
 
         Parameters: data (bytes): bytes to write.
 
         """
-        self.gpio.write(self.RTS_DTR_GPIO_MASK | self.RES_GPIO_MASK) # DC=0, RES=1, RTS/DTR=1
+        self.cd(0)
+        self.res(1)
+        self.cs(0)
+        self.spi.write(bytearray(data))
+        self.cs(1)
 
-        self.spi.exchange(data)
 
+    def write_data(self, data):
+        self.cd(1)
+        self.res(1)
+        self.cs(0)
+        self.spi.write(bytearray(data))
+        self.cs(1)
+
+
+    def set_window(self, x1, y1, x2, y2):
+        self.write_command([0x15, x1, x2, 0x75, y1, y2])
+
+
+    def draw_color_bitmap(self, x, y, width, height, data):
+        self.set_window(x, y, x + width - 1, y + height - 1)
+        for d in data:
+            r = (d >> 11) & 0b11111
+            g = (d >> 5) & 0b111111
+            b = d & 0b11111
+            self.write_data([r << 3 | (g & 0b111), (g & 0b111) | b << 3]) 
+
+
+    def draw_8x8_mono_bitmap(self, x, y, data, r=255, g=255, b=255, bg_r=0, bg_g=0, bg_b=0):
+        self.set_window(x, y, x + 7, y + 7)
+        index = 0
+        rr = r >> 3
+        gg = g >> 2
+        bb = b >> 3
+        bg_rr = bg_r >> 3
+        bg_gg = bg_g >> 2
+        bg_bb = bg_b >> 3
+        for j in range(8):
+            d = data[index]
+            for i in range(8):
+                bit = d & 0x80
+                if bit != 0x00:
+                    self.write_data([rr << 3 | (gg & 0b111), (gg & 0b111) | bb << 3])
+                else:
+                    self.write_data([bg_rr << 3 | (bg_gg & 0b111), (bg_gg & 0b111) | bg_bb << 3])
+                d <<= 1
+            index += 1
+
+
+    # Graphic acceleration commands
+
+    def draw_line(self, x1, y1, x2, y2, r=255, g=255, b=255):
+        self.write_command([0x21, x1, y1, x2, y2, r, g, b])
+
+
+    def draw_rect(self, x1, y1, x2, y2, line_r=255, line_g=255, line_b=255, fill_r=0, fill_g=0, fill_b=0):
+        self.write_command([0x22, x1, y1, x2, y2, line_r, line_g, line_b, fill_r, fill_g, fill_b])
+
+    
+    def copy(self, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y):
+        self.write_command([0x23, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y])
+
+    
+    def dim(self, x1=0, y1=0, x2=95, y2=63):
+        self.write_command([0x24, x1, y1, x2, y2])
+
+
+    def clear(self, x1=0, y1=0, x2=95, y2=63):
+        self.write_command([0x25, x1, y1, x2, y2])
+
+
+    def set_fill(self, ena, rev_copy=False):
+        a = 0x00
+        if ena:
+            a |= 0x01
+        if rev_copy:
+            a |= 0x10
+        self.write_command([0x26, a])
+
+
+    # Valid time intervals: 6, 10, 100 or 200 frames
+    def set_scroll(self, nb_offset_cols, start_row, nb_rows, nb_offset_rows, time_interval=100):
+        TIME_INTERVALS = {6:0x00, 10:0x01, 100:0x2, 200:0x3}
+        if time_interval in TIME_INTERVALS:
+            self.write_command([0x27, nb_offset_cols, start_row, nb_rows, nb_offset_rows, TIME_INTERVALS[time_interval]])
+
+
+    def stop_scroll(self):
+        self.write_command([0x2E])
+
+
+    def start_scroll(self):
+        self.write_command([0x2F])
 
 
 if __name__ == "__main__":
     p = SSD1331()
-
 
