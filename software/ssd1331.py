@@ -82,14 +82,16 @@ class SSD1331:
         bg_rr = bg_r >> 3
         bg_gg = bg_g >> 2
         bg_bb = bg_b >> 3
+        cmds_fg = [rr << 3 | (gg & 0b111), (gg & 0b111) | bb << 3]
+        cmds_bg = [bg_rr << 3 | (bg_gg & 0b111), (bg_gg & 0b111) | bg_bb << 3]
         for j in range(8):
             d = data[index]
             for i in range(8):
                 bit = d & 0x80
                 if bit != 0x00:
-                    self.write_data([rr << 3 | (gg & 0b111), (gg & 0b111) | bb << 3])
+                    self.write_data(cmds_fg)
                 else:
-                    self.write_data([bg_rr << 3 | (bg_gg & 0b111), (bg_gg & 0b111) | bg_bb << 3])
+                    self.write_data(cmds_bg)
                 d <<= 1
             index += 1
 
@@ -98,22 +100,27 @@ class SSD1331:
 
     def draw_line(self, x1, y1, x2, y2, r=255, g=255, b=255):
         self.write_command([0x21, x1, y1, x2, y2, r, g, b])
+        time.sleep(0.001)
 
 
     def draw_rect(self, x1, y1, x2, y2, line_r=255, line_g=255, line_b=255, fill_r=0, fill_g=0, fill_b=0):
         self.write_command([0x22, x1, y1, x2, y2, line_r, line_g, line_b, fill_r, fill_g, fill_b])
+        time.sleep(0.001)
 
     
     def copy(self, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y):
         self.write_command([0x23, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y])
+        time.sleep(0.001)
 
     
     def dim(self, x1=0, y1=0, x2=95, y2=63):
         self.write_command([0x24, x1, y1, x2, y2])
+        time.sleep(0.001)
 
 
     def clear(self, x1=0, y1=0, x2=95, y2=63):
         self.write_command([0x25, x1, y1, x2, y2])
+        time.sleep(0.001)
 
 
     def set_fill(self, ena, rev_copy=False):
