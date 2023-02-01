@@ -65,8 +65,8 @@ def _bound(value, incr, lower_bound, upper_bound):
 
 
 def _trigger(rotary_instance):
-    for listener in rotary_instance._listener:
-        listener()
+    if rotary_instance._cb:
+        rotary_instance._cb(rotary_instance._arg)
 
 
 class Rotary(object):
@@ -85,7 +85,8 @@ class Rotary(object):
         self._state = _R_START
         self._half_step = half_step
         self._invert = invert
-        self._listener = []
+        self._cb = None
+        self._arg = None
 
     def set(self, value=None, min_val=None, incr=None,
             max_val=None, reverse=None, range_mode=None):
@@ -118,22 +119,18 @@ class Rotary(object):
     def close(self):
         self._hal_close()
 
-    def add_listener(self, l):
-        self._listener.append(l)
+    def callback(self, l, arg=None):
+        self._cb = l
+        self._arg = arg
 
-    def remove_listener(self, l):
-        if l not in self._listener:
-            raise ValueError('{} is not an installed listener'.format(l))
-        self._listener.remove(l)
-        
     def _process_rotary_pins(self, pin):
         old_value = self._value
         clk_dt_pins = (self._hal_get_clk_value() <<
                        1) | self._hal_get_dt_value()
-                       
+
         if self._invert:
             clk_dt_pins = ~clk_dt_pins & 0x03
-            
+
         # Determine next state
         if self._half_step:
             self._state = _transition_table_half_step[self._state &
@@ -167,7 +164,7 @@ class Rotary(object):
             self._value = self._value + incr
 
         try:
-            if old_value != self._value and len(self._listener) != 0:
+            if old_value != self._value and self._cb:
                 _trigger(self)
         except:
             pass

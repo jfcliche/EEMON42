@@ -1,12 +1,12 @@
-# import pyftdi.spi
-# import pyftdi.gpio
-import random, time
+import random
+import time
 
-class SSD1331:
+
+class E42Display:
     """ Interface to control the SPI and control lines of a SSD1331 display"""
 
     def __init__(self, spi, cs, cd, res):
-   
+
         self.spi = spi
         self.cs = cs
         self.cd = cd
@@ -19,7 +19,8 @@ class SSD1331:
 
         self.write_command([
             0xAE,        # Display off
-            0xA0, 0b01100000,  # Seg remap = 0b01110010 A[7:6]=01:64k color, A[5]=1 COM splip odd-even, A[4]=1 Scan com, A[3]=0, A[2]=0, A[1]=1, A[0]=0
+            # Seg remap = 0b01110010 A[7:6]=01:64k color, A[5]=1 COM splip odd-even, A[4]=1 Scan com, A[3]=0, A[2]=0, A[1]=1, A[0]=0
+            0xA0, 0b01100000,
             0xA1, 0x00,  # Set Display start line
             0xA2, 0x00,  # Set display offset
             0xA4,        # Normal display
@@ -38,7 +39,6 @@ class SSD1331:
 
         self.write_command([0x26, 1])  # Enable rectangle fill
 
-
     def write_command(self, data):
         """ Writes data bytes
 
@@ -51,7 +51,6 @@ class SSD1331:
         self.spi.write(bytearray(data))
         self.cs(1)
 
-
     def write_data(self, data):
         self.cd(1)
         self.res(1)
@@ -59,10 +58,8 @@ class SSD1331:
         self.spi.write(bytearray(data))
         self.cs(1)
 
-
     def set_window(self, x1, y1, x2, y2):
         self.write_command([0x15, x1, x2, 0x75, y1, y2])
-
 
     def draw_color_bitmap(self, x, y, width, height, data):
         self.set_window(x, y, x + width - 1, y + height - 1)
@@ -70,10 +67,9 @@ class SSD1331:
             r = (d >> 11) & 0b11111
             g = (d >> 5) & 0b111111
             b = d & 0b11111
-            self.write_data([r << 3 | (g & 0b111), (g & 0b111) | b << 3]) 
+            self.write_data([r << 3 | (g & 0b111), (g & 0b111) | b << 3])
 
-
-    def draw_8x8_mono_bitmap(self, x, y, data, r=255, g=255, b=255, bg_r=0, bg_g=0, bg_b=0):
+    def draw_8x8_mono_bitmap(self, x: int, y: int, data: list, r: int = 255, g: int = 255, b: int = 255, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0) -> None:
         self.set_window(x, y, x + 7, y + 7)
         index = 0
         rr = r >> 3
@@ -95,33 +91,29 @@ class SSD1331:
                 d <<= 1
             index += 1
 
-
     # Graphic acceleration commands
 
     def draw_line(self, x1, y1, x2, y2, r=255, g=255, b=255):
         self.write_command([0x21, x1, y1, x2, y2, r, g, b])
         time.sleep(0.001)
 
-
     def draw_rect(self, x1, y1, x2, y2, line_r=255, line_g=255, line_b=255, fill_r=0, fill_g=0, fill_b=0):
-        self.write_command([0x22, x1, y1, x2, y2, line_r, line_g, line_b, fill_r, fill_g, fill_b])
+        self.write_command([0x22, x1, y1, x2, y2, line_r,
+                           line_g, line_b, fill_r, fill_g, fill_b])
         time.sleep(0.001)
 
-    
     def copy(self, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y):
-        self.write_command([0x23, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y])
+        self.write_command(
+            [0x23, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y])
         time.sleep(0.001)
 
-    
     def dim(self, x1=0, y1=0, x2=95, y2=63):
         self.write_command([0x24, x1, y1, x2, y2])
         time.sleep(0.001)
 
-
     def clear(self, x1=0, y1=0, x2=95, y2=63):
         self.write_command([0x25, x1, y1, x2, y2])
         time.sleep(0.001)
-
 
     def set_fill(self, ena, rev_copy=False):
         a = 0x00
@@ -131,22 +123,16 @@ class SSD1331:
             a |= 0x10
         self.write_command([0x26, a])
 
-
     # Valid time intervals: 6, 10, 100 or 200 frames
-    def set_scroll(self, nb_offset_cols, start_row, nb_rows, nb_offset_rows, time_interval=100):
-        TIME_INTERVALS = {6:0x00, 10:0x01, 100:0x2, 200:0x3}
-        if time_interval in TIME_INTERVALS:
-            self.write_command([0x27, nb_offset_cols, start_row, nb_rows, nb_offset_rows, TIME_INTERVALS[time_interval]])
 
+    def set_scroll(self, nb_offset_cols, start_row, nb_rows, nb_offset_rows, time_interval=100):
+        TIME_INTERVALS = {6: 0x00, 10: 0x01, 100: 0x2, 200: 0x3}
+        if time_interval in TIME_INTERVALS:
+            self.write_command([0x27, nb_offset_cols, start_row,
+                               nb_rows, nb_offset_rows, TIME_INTERVALS[time_interval]])
 
     def stop_scroll(self):
         self.write_command([0x2E])
 
-
     def start_scroll(self):
         self.write_command([0x2F])
-
-
-if __name__ == "__main__":
-    p = SSD1331()
-

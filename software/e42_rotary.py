@@ -15,7 +15,7 @@ from sys import platform
 _esp8266_deny_pins = [16]
 
 
-class RotaryIRQ(Rotary):
+class E42Rotary(Rotary):
 
     def __init__(self, pin_num_clk, pin_num_dt, min_val=0, max_val=10, incr=1,
                  reverse=False, range_mode=Rotary.RANGE_UNBOUNDED, pull_up=False, half_step=False, invert=False):
