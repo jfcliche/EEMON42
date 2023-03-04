@@ -1,6 +1,8 @@
-import pyftdi.spi
+# import pyftdi.spi
 
-class ADE7816_SPI:
+class ADE7816:
+    """ Class allowing operation of the ADE7816 split-phase 6-channel energy monitor chip through a SPI interface.
+    """
 
     REGS = {
         'VGAIN' : (0x4380, '32ZPSE'),  #0x000000 Voltage gain adjustment.
@@ -109,63 +111,40 @@ class ADE7816_SPI:
         'HSDC_CFG' : (0xE706, '8U'),  #HSDC configuration register.
         'VERSION' : (0xE707, '8U'),  #of die.
         'CONFIG2' : (0xEC01, '8U'),  #Configuration register (see Table 29).
-}
-
-
-    def __init__(self, url='ftdi://ftdi:2232h/0', freq=1e3):
-
-        self.spi_ctrl = pyftdi.spi.SpiController()
-        self.spi_ctrl.configure('ftdi://ftdi:2232h/0')
-        self.spi = self.spi_ctrl.get_port(cs=0, freq=freq, mode=0)
-
-        # make sure we are in SPI mode by issuing 3 dummy writes as recommended by datasheet
-
-        for _ in range(3):
-            self.write_reg8(0xEBFF,0)
-
-
-    def write_reg8(self, addr, value):
-        """writes 8-bit register
-
-        Parameters:
-
-            addr (int): 16-bit register address
-
-            value (int): 8-bit value to write
-
-        """
-
-        self.spi.exchange((0, (addr>>8) & 0xFF, addr & 0xFF, value))
-
-
-    def write_reg16(self, addr, value):
-        """writes 16-bit register
-
-        Parameters:
-
-            addr (int): 16-bit register address
-
-            value (int): 16-bit value to write
-
-        """
-        if isinstance(addr, str):
-            addr, _ = self.REGS[addr]
-
-        print(f'writing {(0, (addr>>8) & 0xFF, addr & 0xFF, (value >>8) & 0xFF, value & 0xFF)}')
-        self.spi.exchange((0, (addr>>8) & 0xFF, addr & 0xFF, (value >>8) & 0xFF, value & 0xFF))
-
+        'DUMMY' : (0xEBFF, '8U'),  # used For dummy writes at startup. has no effect.
+    }   
 
     FORMATS = {
-    # name: (number_of_bytes_transferred, is_signed_value)
-    '32U': (4, False),  # unsigned 32-bit value
-    '32S': (4, True),  # signed 32-bit value
-    '32SE': (4, True), # signed 24-bit value sign-extended to 32 bits
-    '32ZP': (4, False), # unsigned 24-bit value zero-padded to 32 bits
-    '16U': (2, False),  # unsigned 16-bit value
-    '16S': (2, True),  # signed 16-bit value
-    '8U': (1, False),  # unsigned 8-bit value
-    '8S': (1, True),  # signed 8-bit value
-    }
+        # name: (number_of_bytes_transferred, is_signed_value)
+        '32U': (4, False),  # unsigned 32-bit value
+        '32S': (4, True),  # signed 32-bit value
+        '32SE': (4, True), # signed 24-bit value sign-extended to 32 bits
+        '32ZP': (4, False), # unsigned 24-bit value zero-padded to 32 bits
+        '16U': (2, False),  # unsigned 16-bit value
+        '16S': (2, True),  # signed 16-bit value
+        '8U': (1, False),  # unsigned 8-bit value
+        '8S': (1, True),  # signed 8-bit value
+        }
+
+    def __init__(self, spi, cs_name):
+        """
+        Parameters:
+
+            spi (SPI_with_CS): instance of the SPI_with_CS interface object
+
+            cs_name (str): name of the SPI device as found in the `spi` object.
+
+        """
+
+        self.spi = spi
+        self.cs_name = cs_name
+
+        # make sure we are in SPI mode by issuing 3 dummy writes as recommended by datasheet. 
+        # otherwise we will be in I2C mode
+
+        for _ in range(3):
+            # self.write_reg8(0xEBFF,0)
+            self.write_reg('DUMMY',0)
 
     def read_reg(self, name):
         """Reads a register
@@ -176,12 +155,12 @@ class ADE7816_SPI:
 
         Returns:
 
-            int: value that was read
+            int: value that was read. Will be a signed or unsigned value depending on the register number format. 
         """
 
         (addr, fmt) = self.REGS[name]
         (length, signed) = self.FORMATS[fmt]
-        return int.from_bytes(self.spi.exchange((1, (addr>>8) & 0xFF, addr & 0xFF), readlen=length), 'big', signed=signed)
+        return int.from_bytes(self.spi.exchange(self.cs_name, (1, (addr>>8) & 0xFF, addr & 0xFF), read_length=length), 'big') - signed*(1 << 8 * length)
 
     def write_reg(self, name, value):
         """Writes a register
@@ -197,36 +176,8 @@ class ADE7816_SPI:
         (addr, fmt) = self.REGS[name]
         (length, signed) = self.FORMATS[fmt]
         # print(f"writing {bytes((0, (addr>>8) & 0xFF, addr & 0xFF)) + value.to_bytes(length, 'big')}")
-        self.spi.exchange(bytes((0, (addr>>8) & 0xFF, addr & 0xFF)) + value.to_bytes(length, 'big'))
-
-
-
-    # def read_reg_u32(self, addr):
-    #   """Reads 32-bit register
-
-    #   Parameters:
-
-    #       addr (int): 16-bit register address
-
-    #   Returns:
-    #       int: unsigned 32-bit value
-    #   """
-
-    #   return self.read_reg(length=4, signed=False)
-
-    # def read_reg_u16(self, addr):
-    #   """Reads 16-bit register as unsigned
-
-    #   Parameters:
-
-    #       addr (int): 16-bit register address
-
-    #   Returns:
-    #       int: unsigned 16-bit value
-    #   """
-
-    #   return self.read_reg(length=2, signed=False)
-
+        self.spi.exchange(self.cs_name, bytes((0, (addr>>8) & 0xFF, addr & 0xFF)) + value.to_bytes(length, 'big'))
+ 
     def start_dsp(self):
         self.write_reg('RUN', 1)
         
@@ -242,13 +193,36 @@ class ADE7816_SPI:
         """
         return 256e3/self.read_reg('PERIOD')
 
-class MySpiController(pyftdi.spi.SpiController):
-    SCK_BIT = 0x01
-    DO_BIT = 0x02
-    SPI_BITS = DO_BIT | SCK_BIT
 
-if __name__ == "__main__":
-    p = ADE7816_SPI(freq=2500e3)
+def test(N=0):
+    from machine import Pin
+    from e42_spi import SPI_with_CS
+    import time
+
+    spi = SPI_with_CS(cs_inout_pins={'EMON0': Pin(10)})
+    spi.set_cs_pin_irq('EMON0', lambda p:print(f'{p}={p.value()}'))
+    p = ADE7816(spi, 'EMON0')
     p.start_dsp()
+
+    # Execute N SPI transaction within the SPI context, which keeps the CS lines in OUT mode and disable pin interrupts.
+    # 1000 iterations take 0.648 s. Interrupts are blocked during that whole time.
+    t0=time.time_ns()
+    with spi:
+        for n in range(N):
+            p.read_reg('LCYCMODE')
+    print(f'loop of {N} SPI transactions WITH context took {(time.time_ns()-t0)/1e9:.3f} s')
+
+    # Execute N SPI transaction without the SPI context. The CS lines
+    # directions have to be set and reset on every transaction, but that
+    # allows the pin interrupts to be processed between transactions. 
+    # 1000 iterations take 1.242 s. (half the rate)
+    t0=time.time_ns()
+    for n in range(N):
+        p.read_reg('LCYCMODE')
+    print(f'loop of {N} SPI transactions WITHOUT took {(time.time_ns()-t0)/1e9:.3f} s')
+    return spi, p
+
+# if __name__ == "__main__":
+#     pass
 
 
