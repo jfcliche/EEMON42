@@ -197,10 +197,15 @@ class ADE7816:
 def test(N=0):
     from machine import Pin
     from e42_spi import SPI_with_CS
+    from e42_rotary2 import RotaryEncoder
     import time
 
-    spi = SPI_with_CS(cs_inout_pins={'EMON0': Pin(10)})
-    spi.set_cs_pin_irq('EMON0', lambda p:print(f'{p}={p.value()}'))
+    pin_cs0_rota = Pin(10)
+    pin_cs1_rotb = Pin(9)
+    spi = SPI_with_CS(cs_inout_pins={'EMON0':pin_cs0_rota, 'EMON1': pin_cs1_rotb})
+    rot = RotaryEncoder(pin_cs0_rota, pin_cs1_rotb)
+    spi.set_cs_pin_irq('EMON0', rot.process_state)
+    spi.set_cs_pin_irq('EMON1', rot.process_state)
     p = ADE7816(spi, 'EMON0')
     p.start_dsp()
 
@@ -220,7 +225,7 @@ def test(N=0):
     for n in range(N):
         p.read_reg('LCYCMODE')
     print(f'loop of {N} SPI transactions WITHOUT took {(time.time_ns()-t0)/1e9:.3f} s')
-    return spi, p
+    return spi, p, rot
 
 # if __name__ == "__main__":
 #     pass

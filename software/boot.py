@@ -1,5 +1,5 @@
 # boot.py -- run on boot-up
-a=10
-from machine import Pin, SPI
+# a=10
+# from e42_spi import SPI_with_CS
 from ade7816 import ADE7816, test
-spi, p = test(1000)
+spi, p, rot = test(1000)
