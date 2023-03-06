@@ -138,6 +138,8 @@ class ADE7816:
 
         self.spi = spi
         self.cs_name = cs_name
+        self.cmd = bytearray(3+4)  # command & data bytes
+        self.rx_buf = bytearray(4) # reply word
 
         # make sure we are in SPI mode by issuing 3 dummy writes as recommended by datasheet. 
         # otherwise we will be in I2C mode
@@ -160,7 +162,14 @@ class ADE7816:
 
         (addr, fmt) = self.REGS[name]
         (length, signed) = self.FORMATS[fmt]
-        return int.from_bytes(self.spi.exchange(self.cs_name, (1, (addr>>8) & 0xFF, addr & 0xFF), read_length=length), 'big') - signed*(1 << 8 * length)
+        signed_offset = (1 << 8 * length) if signed else 0
+        cmd = self.cmd
+        rx_buf = self.rx_buf
+        cmd[0] = 1
+        cmd[1] = addr >> 8
+        cmd[2] = addr & 0xff
+        self.spi.exchange(self.cs_name, memoryview(cmd)[:3], memoryview(rx_buf)[:length])
+        return int.from_bytes(rx_buf[:length], 'big') - signed_offset
 
     def write_reg(self, name, value):
         """Writes a register
@@ -176,7 +185,12 @@ class ADE7816:
         (addr, fmt) = self.REGS[name]
         (length, signed) = self.FORMATS[fmt]
         # print(f"writing {bytes((0, (addr>>8) & 0xFF, addr & 0xFF)) + value.to_bytes(length, 'big')}")
-        self.spi.exchange(self.cs_name, bytes((0, (addr>>8) & 0xFF, addr & 0xFF)) + value.to_bytes(length, 'big'))
+        cmd = self.cmd
+        cmd[0] = 0
+        cmd[1] = addr >> 8
+        cmd[2] = addr & 0xff
+        cmd[3:3+length] = value.to_bytes(length, 'big')
+        self.spi.exchange(self.cs_name, memoryview(cmd)[:3+length])
  
     def start_dsp(self):
         self.write_reg('RUN', 1)
@@ -204,8 +218,7 @@ def test(N=0):
     pin_cs1_rotb = Pin(9)
     spi = SPI_with_CS(cs_inout_pins={'EMON0':pin_cs0_rota, 'EMON1': pin_cs1_rotb})
     rot = RotaryEncoder(pin_cs0_rota, pin_cs1_rotb)
-    spi.set_cs_pin_irq('EMON0', rot.process_state)
-    spi.set_cs_pin_irq('EMON1', rot.process_state)
+    spi.set_pin_irq((pin_cs0_rota, pin_cs1_rotb), rot.process_state)
     p = ADE7816(spi, 'EMON0')
     p.start_dsp()
 

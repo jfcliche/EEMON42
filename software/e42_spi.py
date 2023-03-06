@@ -43,15 +43,32 @@ class SPI_with_CS(SPI):
         self.spi_active = False
         self.context_active = False
 
-    def set_cs_pin_irq(self, cs_name, irq_handler, **kwargs):
-        """ Sets the interrupt handler of a CS pin such that it will not be called if the CS pins toggle due to a SPI operation.
+    def set_pin_irq(self, cs_pin, irq_handler, **kwargs):
+        """ Sets the interrupt handler of a CS pin such that it will not be
+        called if the CS pins toggle due to a SPI operation.
+
+        Parameters:
+
+            cs_pin (machine.Pin, str or list/tuple): One or multiple pins,
+                provided as a Pin object or a SPI device name, for which the
+                interrupt routine should be applied.
+
+            irq_handler (fn): Interrupt routine that will be called on changes
+                on the specified pins, only when the SPI port is inactive.
+
+            kwargs: Additional arguments passed to the Pin.irq() call.
         """
         def wrapped_irq_handler(pin):
             if not self.spi_active:
                 irq_handler(pin)
             # else:
             #     print('blobkerd IRQ')
-        self.cs_pins[cs_name].irq(wrapped_irq_handler, **kwargs)
+        if not isinstance(cs_pin, (list, tuple)):
+            cs_pin = (cs_pin,)
+        for pin in cs_pin:
+            if isinstance(pin, str):
+                pin = self.cs_pins[pin] 
+            pin.irq(wrapped_irq_handler, **kwargs)
 
     def enable_spi(self):
         self.spi_active = True  # block pin interrupts
@@ -77,28 +94,32 @@ class SPI_with_CS(SPI):
         self.disable_spi()
         self.context_active = False
 
-    def exchange(self, cs_name, data, read_length=0):
+    def exchange(self, cs_name, data, read_buf=None):
         """ Writes `data` to the SPI port and then read `read_length` bytes of the device specified by `cs_name` while
         ensuring the .
 
         Parameters:
 
-            data (bytes or list of int): Data to write.
+            data (bytes): Data to write.
 
         Returns:
             `read_length` bytes.
 
         Note: Using pre-allocated bytearrays and memoryview made the call slower, not faster... But we were still copying `data`
         """ 
-        if not isinstance(data, bytes):
-            data = bytes(data)
-        din = bytearray(len(data) + read_length)
+        # if not isinstance(data, bytes):
+        #     data = bytes(data)
+        # din = bytearray(len(data) + read_length)
+        # din = bytearray(read_length)
         cs_pin = self.cs_pins[cs_name]
         if not self.context_active:
             self.enable_spi()
+
         cs_pin.value(0) # enable target CS line
-        self.write_readinto(data+b'\x00'*read_length, din) # perform SPI transaction
+        # self.write_readinto(data+b'\x00'*read_length, din) # perform SPI transaction
+        self.write(data) # perform SPI transaction
+        self.readinto(read_buf) if read_buf else [] # perform SPI transaction
         cs_pin.value(1) # disable target CS line
         if not self.context_active:
             self.disable_spi()
-        return din[-read_length:]
+        # return din

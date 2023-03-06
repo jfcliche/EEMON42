@@ -1,42 +1,78 @@
 class RotaryEncoder():
-	""" Implement rotary encoder decoding.
+    """ Implement rotary encoder decoding.
 
-	The rotary encoder sequence for the two encoder pins is 11, 01, 00, 10, 11 for clockwise rotation, 
-	and the sequence is in the opposite direction for counterclockwise rotation.
-	The detent (stable state) is on 11.
+    The rotary encoder sequence for the two encoder pins is 11, 01, 00, 10, 11 for clockwise rotation, 
+    and the sequence is in the opposite direction for counterclockwise rotation.
+    The detent (stable state) is on 11.
 
-	The encoder position is stored in `self.counter`. We increment or
-	decrement the counter when the last 3 bit patterns of the encoder end
-	up in the final detent position.
+    The encoder position is stored in `self._value` and is accessed with `self.value()`. 
 
-	Parameters:
+    Principle of operation: each each time we call `process_state()`, we increment the `sub_incr` counter by the direction of
+    movement (+1, -1) obtained from the previous and current encoder state. If the current encoder lands in its detent
+    position ('11'), we add `sub_incr//4` to the counter, i.e. it will add +1 or -1 only if we have detected +4 or -4
+    subincrements since the last detent landing.
 
-		pin_a, pin_b (machine.Pin): Pins connected to the rotary encoder.
-			These pins must already have been configured properly, and an
-			interrupt pointing to `process_state` must have been set on both pins.
-		"""
-	def __init__(self, pin_a, pin_b):
-		self.pin_a = pin_a
-		self.pin_b = pin_b
-		self.counter = 0
-		self.state = 0b111111
+    Invalid transition (skipping 2 encoder phases states) are problematic as we can't tell which direction we went. We
+    try to salvage some of those those events and increase our accuracy by keeping track of these missed counts and
+    adding later with the direction of the other valid increments. We don't use the missed counts if increment count is
+    null. Of course this won't help if we miss too many states between `process_state()` calls.
 
-	def process_state(self, pin):
-		""" Encoder state processing method, meant to be used as an pin interrupt routine.
+    Parameters:
 
-		Parameters:
+        pin_a, pin_b (machine.Pin): Pins connected to the rotary encoder.
+            These pins must already have been configured properly, and an
+            interrupt pointing to `process_state` must have been set on both pins.
 
-			pin (machine.Pin): Pin that caused the interrupt, as passed by the pin interrupt handler. This is not used.
+        verbose (int): verbose level for testing
 
-		"""
-		pins = (self.pin_a.value() << 1) | self.pin_b.value() # get the two encoder pin values
-		if pins == self.state & 0b11: # do nothing if they have not changed
-			return
-		self.state = ((self.state & 0b1111) << 2) | pins  # shift left the 2 bits into the state register
-		old_counter = self.counter  # debug
-		if self.state == 0b001011: # last 3 values are the clockwise sequence ending on a detent (00, 10, 11)
-			self.counter += 1
-		elif self.state == 0b000111: # last 3 values are the counterclockwise sequence ending on a detent (00, 01, 11)
-			self.counter -= 1
-		if self.counter != old_counter: # debug
-			print(f'counter={self.counter}')
+    """
+
+    # Direction table: maps the previous and current encoder pin values (Aprev Bprev Acur Bcur) to the direction of the
+    # rotation. Values in parentheses and invalid changes (2 phase jumps = > ambiguous sign).
+    dir_table = [
+        0, -1, 1, (0), 1, 0, (0), -1,  # 0000, 0001, 0010, 0011, 0100, 0101, 0110, 0111
+        -1, (0), 0, 1, (0), 1, -1, 0  # 1000, 1001, 1010, 1011, 1100, 1101, 1110, 1111
+        ]
+    def __init__(self, pin_a, pin_b, verbose=2):
+        self.pin_a = pin_a
+        self.pin_b = pin_b
+        self._value = 0  # final encoder position 
+        self.prev_pins = 0b11  # stores the previous encoder pin state
+        self.sub_incr = 0  # tracks cumulative phase increments between detents
+        self.invalid = 0  # number of invalid state changes
+        self.verbose = verbose
+    def value(self):
+        return self._value
+
+    def reset(self):
+        self._value = 0
+
+    def process_state(self, pin):
+        """ Encoder state processing method, meant to be used as an pin interrupt routine.
+
+        Parameters:
+
+            pin (machine.Pin): Pin that caused the interrupt, as passed by the pin interrupt handler to *both* encoder pins. This parameter is not used since we already know the two pins we need to probe.
+
+        """
+        pins = (self.pin_a.value() << 1) | self.pin_b.value() # get the two encoder pin values
+        # Do nothing if the encoder pins have not changed. This happens often, 
+        # so let's save some CPU cycles by stopping right here. 
+        if pins == self.prev_pins: 
+            return
+        incr = self.dir_table[(self.prev_pins << 2) | pins] # get direction of rotation from previous and current state
+        self.sub_incr += incr  # increment with direction between 
+        self.invalid += not incr # count the number of invalid transition; we'll handle them later in the final detent tally
+        if self.verbose:
+            if self.verbose > 1:
+                print(f'pins {self.prev_pins:02b}=>{pins:02b}, dir={self.dir_table[(self.prev_pins << 2) | pins]}, sub_incr={self.sub_incr}, invalid={self.invalid}')
+            if not incr: 
+                print(f'Missed a count!')
+        self.prev_pins = pins
+        old_counter = self._value  # debug
+        if pins == 0b11: # we landed on the detent position. Assess our increment.
+            # add sub_incr/4, after adding invalid counts as jumps of 2 in the direction of the valid ones
+            self._value += (self.sub_incr + (self.invalid << 1 if self.sub_incr > 0 else -self.invalid << 1 if self.sub_incr < 0 else 0)) >> 2
+            self.sub_incr = self.invalid = 0 # start anew
+        if self.verbose and self._value != old_counter: 
+            print(f'value={self._value}')
