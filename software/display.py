@@ -2,7 +2,7 @@ import random
 import time
 
 
-class E42Display:
+class Display:
     """ Interface to control the SPI and control lines of a SSD1331 display"""
 
     def __init__(self, spi, cs, cd, res):

@@ -1,7 +1,8 @@
 from machine import Pin, SPI, SoftSPI
-from e42_display import E42Display
-from e42_button import E42Button
-from e42_rotary import E42Rotary
+from display import Display
+from button import Button
+from e42_spi import SPI_with_CS
+from e42_rotary2 import RotaryEncoder
 from gui import GUI
 import time
 from umqttsimple import MQTTClient
@@ -71,7 +72,7 @@ def init():
     global spi
     spi = SPI(1, baudrate=5000000, sck=pin_sck, mosi=pin_mosi, miso=pin_miso)
     global display
-    display = E42Display(spi=spi, cs=pin_cs, cd=pin_cd, res=pin_res)
+    display = Display(spi=spi, cs=pin_cs, cd=pin_cd, res=pin_res)
 
 
 def dispose():
@@ -86,11 +87,17 @@ def start_gui():
     global counter
     counter = 0
 
-    rot_enc = E42Rotary(pin_num_clk=9, pin_num_dt=10, pull_up=True)
-    button_rot = E42Button(Pin(8, Pin.IN, Pin.PULL_UP), None)
-    button_a = E42Button(Pin(5, Pin.IN, Pin.PULL_UP), None)
-    button_b = E42Button(Pin(4, Pin.IN, Pin.PULL_UP), None)
-    button_c = E42Button(Pin(3, Pin.IN, Pin.PULL_UP), None)
+    pin_cs0_rota = Pin(10)
+    pin_cs1_rotb = Pin(9)
+    spi = SPI_with_CS(
+        cs_inout_pins={'EMON0': pin_cs0_rota, 'EMON1': pin_cs1_rotb})
+    rot_enc = RotaryEncoder(pin_cs0_rota, pin_cs1_rotb, verbose=0)
+    spi.set_pin_irq((pin_cs0_rota, pin_cs1_rotb), rot_enc.process_state)
+
+    button_rot = Button(Pin(8, Pin.IN, Pin.PULL_UP))
+    button_a = Button(Pin(5, Pin.IN, Pin.PULL_UP))
+    button_b = Button(Pin(4, Pin.IN, Pin.PULL_UP))
+    button_c = Button(Pin(3, Pin.IN, Pin.PULL_UP))
 
     display.clear()
 

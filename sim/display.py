@@ -1,7 +1,7 @@
 import pygame
 
 
-class SimDisplay:
+class Display:
 
     def __init__(self, surface: pygame.surface.Surface):
         self.surface = surface

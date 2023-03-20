@@ -1,9 +1,12 @@
 import sys
+sys.pycache_prefix = "__pycache__"  # NOQA
+sys.path.append("../software")  # NOQA
+
 import pygame
 from gui import GUI
-from sim_display import SimDisplay
-from sim_rotary import SimRotary
-from sim_button import SimButton
+from display import Display
+from rotary import RotaryEncoder
+from button import Button
 
 SCREEN_SCALE = 4
 
@@ -25,36 +28,36 @@ def event_loop():
             button_b.handle_event(event)
             button_c.handle_event(event)
 
-        screen.blit(board, screen.get_rect())
-        screen.blit(surface, (180, 66))
-        if zoom_display:
-            screen.blit(pygame.transform.scale(
-                surface, (96*2, 64*2)), (0, screen.get_rect().bottom-64*2))
-        pygame.draw.rect(screen, (255, 0, 0), button_rot.rect(), 5)
-        pygame.draw.rect(screen, (255, 0, 0), button_a.rect(), 5)
-        pygame.draw.rect(screen, (255, 0, 0), button_b.rect(), 5)
-        pygame.draw.rect(screen, (255, 0, 0), button_c.rect(), 5)
-        pygame.display.flip()
+    screen.blit(board, screen.get_rect())
+    screen.blit(surface, (180, 66))
+    if zoom_display:
+        screen.blit(pygame.transform.scale(
+            surface, (96*2, 64*2)), (0, screen.get_rect().bottom-64*2))
+    pygame.draw.rect(screen, (255, 0, 0), button_rot.rect(), 5)
+    pygame.draw.rect(screen, (255, 0, 0), button_a.rect(), 5)
+    pygame.draw.rect(screen, (255, 0, 0), button_b.rect(), 5)
+    pygame.draw.rect(screen, (255, 0, 0), button_c.rect(), 5)
+    pygame.display.flip()
 
 
 def main():
     global screen, surface, rot, button_rot, button_a, button_b, button_c, board
 
     pygame.init()
-    board = pygame.image.load("software/eemon42.png")
+    board = pygame.image.load("eemon42.png")
     pygame.display.set_caption("EEMON42 Simulator")
     screen = pygame.display.set_mode(board.get_size())
     surface = pygame.surface.Surface((96, 64))
 
-    display = SimDisplay(surface)
-    rot = SimRotary()
-    button_rot = SimButton(pygame.Rect(
+    display = Display(surface)
+    rot = RotaryEncoder()
+    button_rot = Button(pygame.Rect(
         169, 165, 58, 47))
-    button_a = SimButton(pygame.Rect(
+    button_a = Button(pygame.Rect(
         246, 161, 26, 28))
-    button_b = SimButton(pygame.Rect(
+    button_b = Button(pygame.Rect(
         246, 203, 26, 28))
-    button_c = SimButton(pygame.Rect(
+    button_c = Button(pygame.Rect(
         246, 245, 26, 28))
 
     gui = GUI(display, rot, button_rot, button_a,
