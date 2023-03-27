@@ -3,7 +3,7 @@ import pygame
 
 class Button:
 
-    def __init__(self, rect):
+    def __init__(self, *args, rect=None, **kwargs):
         self._rect = rect
         self._cb = None
         self._arg = None
@@ -11,6 +11,9 @@ class Button:
 
     def rect(self):
         return self._rect
+
+    def set_rect(self, rect):
+        self._rect = rect
 
     def value(self):
         ret_value = self._value
