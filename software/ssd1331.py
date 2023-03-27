@@ -2,22 +2,29 @@ import random
 import time
 
 
-class Display:
-    """ Interface to control the SPI and control lines of a SSD1331 display"""
+class SSD1331:
+    """ Object to operate SSD1331-based OLED displays via its SPI interface
 
-    def __init__(self, spi, cs, cd, res):
+    Parameters:
+
+        spi (SPI_with_CS): SPI_with_CS instance (SPI object with chip select handling)
+
+        cs_pin (machine.Pin): pin that controls the display's chip select line. The pin mode must be set by the user.
+
+        cd_pin (machine.Pin): pin that controls the display's command/data line. The pin mode must be set by the user.
+
+        res_pin (machine.Pin): pin that controls the display's reset line. The pin mode must be set by the user.
+
+    """
+
+    def __init__(self, spi, cs_pin, cd_pin, res_pin):
 
         self.spi = spi
         self.cs = cs
         self.cd = cd
         self.res = res
 
-        self.res(0)
-        time.sleep(0.01)
-        self.res(1)
-        time.sleep(0.01)
-
-        self.write_command([
+        self.write_command((
             0xAE,        # Display off
             # Seg remap = 0b01110010 A[7:6]=01:64k color, A[5]=1 COM splip odd-even, A[4]=1 Scan com, A[3]=0, A[2]=0, A[1]=1, A[0]=0
             0xA0, 0b01100000,
@@ -34,29 +41,34 @@ class Display:
             0x8C, 0x80,  # Set precharge speed C
             0xBB, 0x3E,  # Set pre-charge voltage
             0xBE, 0x3E,  # Set voltage
-            0x87, 15])  # Master current control 1 = dim= 35mA, 15=bright=113mA
-        self.write_command([0xAF])  # display ON
+            0x87, 15))  # Master current control 1 = dim= 35mA, 15=bright=113mA
+        self.write_command((0xAF,))  # display ON
 
-        self.write_command([0x26, 1])  # Enable rectangle fill
+        self.write_command((0x26, 1))  # Enable rectangle fill
+
+    def reset(self):
+
+        self.res(0)
+        time.sleep(0.01)
+        self.res(1)
+        time.sleep(0.01)
 
     def write_command(self, data):
         """ Writes data bytes
 
-        Parameters: data (bytes): bytes to write.
+        Parameters: 
+
+            data (list of int or bytes): list of integers representing the
+                command bytes to send to the display. Can also be a byte
+                string or bytearray.
 
         """
         self.cd(0)
-        self.res(1)
-        self.cs(0)
-        self.spi.write(bytearray(data))
-        self.cs(1)
+        self.spi.write(self.cs, bytearray(data))
 
     def write_data(self, data):
         self.cd(1)
-        self.res(1)
-        self.cs(0)
-        self.spi.write(bytearray(data))
-        self.cs(1)
+        self.spi.write(self.cs, bytearray(data))
 
     def set_window(self, x1, y1, x2, y2):
         self.write_command([0x15, x1, x2, 0x75, y1, y2])
@@ -94,25 +106,25 @@ class Display:
     # Graphic acceleration commands
 
     def draw_line(self, x1, y1, x2, y2, r=255, g=255, b=255):
-        self.write_command([0x21, x1, y1, x2, y2, r, g, b])
+        self.write_command((0x21, x1, y1, x2, y2, r, g, b))
         time.sleep(0.001)
 
     def draw_rect(self, x1, y1, x2, y2, line_r=255, line_g=255, line_b=255, fill_r=0, fill_g=0, fill_b=0):
-        self.write_command([0x22, x1, y1, x2, y2, line_r,
-                           line_g, line_b, fill_r, fill_g, fill_b])
+        self.write_command((0x22, x1, y1, x2, y2, line_r,
+                           line_g, line_b, fill_r, fill_g, fill_b))
         time.sleep(0.001)
 
     def copy(self, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y):
         self.write_command(
-            [0x23, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y])
+            (0x23, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y))
         time.sleep(0.001)
 
     def dim(self, x1=0, y1=0, x2=95, y2=63):
-        self.write_command([0x24, x1, y1, x2, y2])
+        self.write_command((0x24, x1, y1, x2, y2))
         time.sleep(0.001)
 
     def clear(self, x1=0, y1=0, x2=95, y2=63):
-        self.write_command([0x25, x1, y1, x2, y2])
+        self.write_command((0x25, x1, y1, x2, y2))
         time.sleep(0.001)
 
     def set_fill(self, ena, rev_copy=False):
@@ -121,7 +133,7 @@ class Display:
             a |= 0x01
         if rev_copy:
             a |= 0x10
-        self.write_command([0x26, a])
+        self.write_command((0x26, a))
 
     # Valid time intervals: 6, 10, 100 or 200 frames
 
@@ -132,7 +144,7 @@ class Display:
                                nb_rows, nb_offset_rows, TIME_INTERVALS[time_interval]])
 
     def stop_scroll(self):
-        self.write_command([0x2E])
+        self.write_command((0x2E,))
 
     def start_scroll(self):
-        self.write_command([0x2F])
+        self.write_command((0x2F,))
