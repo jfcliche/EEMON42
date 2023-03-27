@@ -2,7 +2,7 @@ import pygame
 
 
 class RotaryEncoder:
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self._value = 0
 
     def handle_event(self, event):
