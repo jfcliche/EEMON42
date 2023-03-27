@@ -1,68 +1,116 @@
+#!/usr/bin/env python 
+
 import sys
 sys.pycache_prefix = "__pycache__"  # NOQA
+# add the EEMON42 application folder after this package so emulated modules will be loaded
 sys.path.append("../software")  # NOQA
 
 import pygame
-from gui import GUI
-from display import Display
-from rotary import RotaryEncoder
+import socket
+import struct
+import binascii
+import asyncio
+
+sys.modules['usocket'] = socket
+sys.modules['ustruct'] = struct
+sys.modules['ubinascii'] = binascii
+
+# local imports
+# from gui import GUI
+# from display import Display
+# from rotary import RotaryEncoder
+# from button import Button
+from ssd1331 import SSD1331
+
+from eemon42 import EEMON42
 from button import Button
 
-SCREEN_SCALE = 4
-
-zoom_display = False
+# SCREEN_SCALE = 4
 
 
-def event_loop():
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.display.quit()
-            sys.exit()
-        elif event.type == pygame.MOUSEBUTTONDOWN and pygame.Rect.collidepoint(pygame.Rect(180, 66, 96, 64), event.pos) and event.button == 1:
-            global zoom_display
-            zoom_display = not zoom_display
-        else:
-            rot.handle_event(event)
-            button_rot.handle_event(event)
-            button_a.handle_event(event)
-            button_b.handle_event(event)
-            button_c.handle_event(event)
+class EEMON42Sim(EEMON42):
 
-    screen.blit(board, screen.get_rect())
-    screen.blit(surface, (180, 66))
-    if zoom_display:
-        screen.blit(pygame.transform.scale(
-            surface, (96*2, 64*2)), (0, screen.get_rect().bottom-64*2))
-    pygame.draw.rect(screen, (255, 0, 0), button_rot.rect(), 5)
-    pygame.draw.rect(screen, (255, 0, 0), button_a.rect(), 5)
-    pygame.draw.rect(screen, (255, 0, 0), button_b.rect(), 5)
-    pygame.draw.rect(screen, (255, 0, 0), button_c.rect(), 5)
-    pygame.display.flip()
+    zoom_display = False
 
+    async def pygame_event_loop(self):
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.display.quit()
+                    self.main_task.cancel()  # cancel the main task to exit the program
+                    return
 
-def main():
-    global screen, surface, rot, button_rot, button_a, button_b, button_c, board
+                # call the event handler of each widget
+                for widget in self.widgets:
+                    widget.handle_event(event)
 
-    pygame.init()
-    board = pygame.image.load("eemon42.png")
-    pygame.display.set_caption("EEMON42 Simulator")
-    screen = pygame.display.set_mode(board.get_size())
-    surface = pygame.surface.Surface((96, 64))
+            # Check if zoom button was pressed
+            if self.zoom_button.value():
+                self.zoom_display = not self.zoom_display
 
-    display = Display(surface)
-    rot = RotaryEncoder()
-    button_rot = Button(pygame.Rect(
-        169, 165, 58, 47))
-    button_a = Button(pygame.Rect(
-        246, 161, 26, 28))
-    button_b = Button(pygame.Rect(
-        246, 203, 26, 28))
-    button_c = Button(pygame.Rect(
-        246, 245, 26, 28))
+            # Display screen
+            self.screen.blit(self.board, self.screen.get_rect())
+            self.screen.blit(self.surface, (180, 66))
 
-    gui = GUI(display, rot, button_rot, button_a,
-              button_b, button_c, event_loop=event_loop)
-    print(gui.show_text_input(0, 0, 8))
+            # Display screen zoom insert, if activated
+            if self.zoom_display:
+                self.screen.blit(pygame.transform.scale(
+                    self.surface, (96*2, 64*2)), (0, self.screen.get_rect().bottom-64*2))
+
+            # Display widget bounding boxes
+            for widget in self.widgets:
+                if hasattr(widget, 'rect'):
+                    pygame.draw.rect(self.screen, (255, 0, 0), widget.rect(), 5)
+            pygame.display.flip()
+            await asyncio.sleep(0.03)
+        print('pygame event processing loop has exited')
+
+    def __init__(self):
+        pygame.init()
+        self.board = pygame.image.load("eemon42.png")
+        pygame.display.set_caption("EEMON42 Simulator")
+        self.screen = pygame.display.set_mode(self.board.get_size())
+        self.surface = pygame.surface.Surface((96, 64))
 
 
-main()
+        # Initialize the original EEMON42
+        super().__init__()
+
+        # Pass the surface object to the emulated display instance. 
+        self.display.set_surface(self.surface)  
+
+        # Pass graphical parameters to the emulated button instances
+        self.button_rot.set_rect(pygame.Rect(169, 165, 58, 47))
+        self.button_a.set_rect(pygame.Rect(246, 161, 26, 28))
+        self.button_b.set_rect(pygame.Rect(246, 203, 26, 28))
+        self.button_c.set_rect(pygame.Rect(246, 245, 26, 28))
+
+        # add a display zoom button
+        self.zoom_button = Button(rect=pygame.Rect(180-6, 66-6, 96 + 12, 64 + 12))
+
+        # create a list of graphical widgets to process 
+        self.widgets = (self.rot_enc,
+                        self.button_rot,
+                        self.button_a,
+                        self.button_b,
+                        self.button_c,
+                        self.zoom_button
+                        )
+    async def main_loop(self):
+        """ Runs the main program loop of the EEMON42, with an additional pygame display handling task.
+        """
+        self.pygame_task = asyncio.create_task(self.pygame_event_loop())
+        self.main_task = asyncio.create_task(super().main_loop())  # start main loop as an explicit task so we can cancel it.
+        await self.main_task # Run until the main loop exits for some reason (return or exception)
+
+    def run(self):
+        try:
+            asyncio.run(self.main_loop())
+        except asyncio.CancelledError:
+            print('Cancelled by user. Bye!')
+        except KeyboardInterrupt:
+            print('Interrupted by user. Bye!')
+
+if __name__=="__main__":
+    sim = EEMON42Sim()
+    sim.run()
