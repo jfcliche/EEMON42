@@ -17,40 +17,54 @@ class SPI_with_CS(SPI):
 
     Parameters:
 
-        cs_out_pins (dict): dict mapping the SPI device name with the Pin handling its chip select (CS) line for pins used in output mode only. 
+        baudrate (int or float): SPI baud rate, in bps. Default is 2.5 MHz.
 
-        cs_inout_pins (dict): same as `cs_out_pins`, except that the specified pins are dual function: they are in IN mode but are all set to OUT mode  during SPI transactions.
+        sck (Pin): pin associated to the SPI clock. Mode must be set by the user.
 
-        baud_rate (int or float): SPI baud rate, in bps. Default is 2.5 MHz.
+        miso (Pin): pin associated to the SPI MISO signal. Mode must be set by the user.
+
+        mosi (Pin): pin associated to the SPI MOSI signal. Mode must be set by the user.
+
+        cs_inout_pins (tuple or list): list of dual-function machine.PIN
+            objects that should be in IN and PULL_UP mode except during SPI transactions
+            where they *must* be in OUT mode. The pins are set to the IN mode with
+            PULL_UP at initialization.
+
+        cs_out_pins (tuple or list): List of Pin objects to be set in the OUT
+            mode at initialization. This is for convenience; this parameter
+            does not have to be specified  if the pin modes are handled by the
+            user.
+
+
+        kwargs: all other keywords arguments are passed to the machine.SPI class
 
     """
-    def __init__(self, cs_out_pins={}, cs_inout_pins={}, baud_rate=2.5e6):
-        super().__init__(1, int(baud_rate))
-        self.cs_pins = {}  # Map of all CS pins (both output-only and in/out)
-        self.cs_inout_pins = {}  # Map of input-output (dual function) CS pins
+    def __init__(self, baudrate=2.5e6, sck=None, mosi=None, miso=None, cs_out_pins=tuple(), cs_inout_pins=tuple(), **kwargs):
+        super().__init__(1, int(baudrate), sck=sck, mosi=mosi, miso=miso, **kwargs)
+        self.cs_inout_pins = cs_inout_pins  # list of input-output (dual function) CS pins
  
-        # Initialize output-only CS pins
-        for cs_name, pin in cs_out_pins.items(): 
+        # Initialize output-only CS pins. This is done only once here. The mode of this pin is not changed during SPI transactions.
+        for pin in cs_out_pins: 
             pin.init(Pin.OUT)
-            self.cs_pins[cs_name] = pin
  
-        # Initialize input-output CS pins
-        for cs_name, pin in cs_inout_pins.items(): 
+        # Initialize input-output CS pins. The mode of these pins are changed during SPI transactions.
+        for pin in cs_inout_pins: 
             pin.init(Pin.IN, Pin.PULL_UP)
-            self.cs_pins[cs_name] = pin
-            self.cs_inout_pins[cs_name] = pin
 
         self.spi_active = False
         self.context_active = False
 
-    def set_pin_irq(self, cs_pin, irq_handler, **kwargs):
-        """ Sets the interrupt handler of a CS pin such that it will not be
-        called if the CS pins toggle due to a SPI operation.
+    def get_irq(self, irq_handler):
+        """ Return a Pin interrupt handler that will call `irq_handler` 
+        only if the SPI port is not active.
+
+        Interrupt handlers for pins that have a shared function with the SPI
+        CS lines should be obtained through this method to prevent unwanted
+        interrupts to be caused by SPI transactions. 
 
         Parameters:
 
-            cs_pin (machine.Pin, str or list/tuple): One or multiple pins,
-                provided as a Pin object or a SPI device name, for which the
+            cs_pin (machine.Pin): One or multiple pins for which the
                 interrupt routine should be applied.
 
             irq_handler (fn): Interrupt routine that will be called on changes
@@ -59,27 +73,24 @@ class SPI_with_CS(SPI):
             kwargs: Additional arguments passed to the Pin.irq() call.
         """
         def wrapped_irq_handler(pin):
+            """ Calls the IRQ handler only if SPI is not active"""
             if not self.spi_active:
                 irq_handler(pin)
             # else:
-            #     print('blobkerd IRQ')
-        if not isinstance(cs_pin, (list, tuple)):
-            cs_pin = (cs_pin,)
-        for pin in cs_pin:
-            if isinstance(pin, str):
-                pin = self.cs_pins[pin] 
-            pin.irq(wrapped_irq_handler, **kwargs)
+            #     print('blocked IRQ')
+ 
+        return wrapped_irq_handler
 
     def enable_spi(self):
         self.spi_active = True  # block pin interrupts
         # put dual-function pins in OUT mode to prevent CS lines from being activated by their dual-function devices (e.g. switches)
         # print('settint to OUT')
-        for pin in self.cs_inout_pins.values():
+        for pin in self.cs_inout_pins:
             pin.init(mode=Pin.OUT, value=1)
 
     def disable_spi(self):
         # print('settint to IN')
-        for pin in self.cs_inout_pins.values():
+        for pin in self.cs_inout_pins:
             pin.init(mode=Pin.IN)
 
         # print('enabling irq')
@@ -94,16 +105,26 @@ class SPI_with_CS(SPI):
         self.disable_spi()
         self.context_active = False
 
-    def exchange(self, cs_name, data, read_buf=None):
-        """ Writes `data` to the SPI port and then read `read_length` bytes of the device specified by `cs_name` while
-        ensuring the .
+    def exchange(self, cs_pin, data, read_buf=None):
+        """ Writes `data` to the SPI port and then read bytes into `read_buf`while the chip select pin `cs_pin` is activated
+        and ensuring that all dual-function pins are temporarily set to the OUT mode to prevent unwanted activation during the transaction. 
+
+        IRQ handlers created through the `set_pin_irq()` method are disabled during the transaction.
+
+        Use the context manager ``with spi:`` wo wrap a group of
+        transactions to avoid the overhead of setting the dual-function pins on each
+        transaction.
+
 
         Parameters:
+            cs_pin (machine.Pin): chip-select pin to be activated (LOW) during the transaction
 
             data (bytes): Data to write.
 
+            read_buf (buffer): read ``len(read_buf)`` into `read_buf` if not `None`.
+
         Returns:
-            `read_length` bytes.
+            None
 
         Note: Using pre-allocated bytearrays and memoryview made the call slower, not faster... But we were still copying `data`
         """ 
@@ -111,7 +132,6 @@ class SPI_with_CS(SPI):
         #     data = bytes(data)
         # din = bytearray(len(data) + read_length)
         # din = bytearray(read_length)
-        cs_pin = self.cs_pins[cs_name]
         if not self.context_active:
             self.enable_spi()
 
@@ -123,3 +143,5 @@ class SPI_with_CS(SPI):
         if not self.context_active:
             self.disable_spi()
         # return din
+
+    write = exchange  # write method just calls exchange
