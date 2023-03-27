@@ -43,6 +43,7 @@ class EEMON42:
         self.client = None # wifi client
         self.fatal_error = False
         self.client_id = ubinascii.hexlify(machine.unique_id())  # too bad the bytes.hex() function is not supported.
+        self.station = None
 
         self.message_interval = 5
 
@@ -78,7 +79,7 @@ class EEMON42:
                 )
 
         # Display handler
-        self.display = SSD1331(spi=self.spi, cs=self.pin_cs7_disp, cd=self.pin_cd, res=self.pin_res)
+        self.display = SSD1331(spi=self.spi, cs_pin=self.pin_cs7_disp, cd_pin=self.pin_cd, res_pin=self.pin_res)
 
         self.counter = 0
 
@@ -171,6 +172,7 @@ class EEMON42:
     async def process_mqtt_messages(self):
         """ Continuously look for new data to send and sent it when available 
         """
+        counter = 0
         while True:
             try:
                 counter += 1
@@ -222,7 +224,7 @@ class EEMON42:
         # Start background tasks
         print('Starting background tasks')
         tasks = (
-            asyncio.create_task(self.watchdog()), # reboots if there is a fatal error
+            # asyncio.create_task(self.watchdog()), # reboots if there is a fatal error
             asyncio.create_task(self.start_wifi_client()), # connect wifi
             asyncio.create_task(self.mqtt_connect_and_subscribe()), # connects MQTT client when wifi is up
             asyncio.create_task(self.process_mqtt_messages()) # sends MQTT messages when MQTT client is connected

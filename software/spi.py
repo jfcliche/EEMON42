@@ -39,8 +39,9 @@ class SPI_with_CS(SPI):
         kwargs: all other keywords arguments are passed to the machine.SPI class
 
     """
-    def __init__(self, baudrate=2.5e6, sck=None, mosi=None, miso=None, cs_out_pins=tuple(), cs_inout_pins=tuple(), **kwargs):
-        super().__init__(1, int(baudrate), sck=sck, mosi=mosi, miso=miso, **kwargs)
+    def __init__(self, baudrate=2.5e6, sck=None, mosi=None, miso=None, cs_out_pins=tuple(), cs_inout_pins=tuple()):
+        super().__init__(1, int(baudrate))
+        # self.init(baudrate=int(baudrate), sck=sck, mosi=mosi, miso=miso)
         self.cs_inout_pins = cs_inout_pins  # list of input-output (dual function) CS pins
  
         # Initialize output-only CS pins. This is done only once here. The mode of this pin is not changed during SPI transactions.
@@ -144,4 +145,5 @@ class SPI_with_CS(SPI):
             self.disable_spi()
         # return din
 
-    write = exchange  # write method just calls exchange
+    # def write(self, cs_pin, data):
+    #     self.exchange(cs_pin, data)  # write method just calls exchange

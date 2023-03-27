@@ -4,6 +4,9 @@
 # def spi_test():
 from ade7816 import ADE7816, test
 import time
+from eemon42 import EEMON42
+e = EEMON42()
+
 # spi, p, rot = test(1000)
  
 def shift_test():

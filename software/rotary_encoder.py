@@ -51,9 +51,9 @@ class RotaryEncoder():
         # Set rotary encoder pins IRQ callback to the encoder handler so it can keep track of pin level changes. 
         # Use process_state() unless a custom handler is provided 
 
-        irq_handler = irq_wrapper(self.proces_state) if irq_wrapper else self.process_state;
-        self.pin_cs0_rota.irq(irq_handler) 
-        self.pin_cs0_rotb.irq(irq_handler)
+        irq_handler = irq_wrapper(self.process_state) if irq_wrapper else self.process_state;
+        self.pin_a.irq(irq_handler) 
+        self.pin_b.irq(irq_handler)
 
     def value(self):
         return self._value

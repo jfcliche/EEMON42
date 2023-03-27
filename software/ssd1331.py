@@ -20,9 +20,9 @@ class SSD1331:
     def __init__(self, spi, cs_pin, cd_pin, res_pin):
 
         self.spi = spi
-        self.cs = cs
-        self.cd = cd
-        self.res = res
+        self.cs = cs_pin
+        self.cd = cd_pin
+        self.res = res_pin
 
         self.write_command((
             0xAE,        # Display off
@@ -64,11 +64,11 @@ class SSD1331:
 
         """
         self.cd(0)
-        self.spi.write(self.cs, bytearray(data))
+        self.spi.exchange(self.cs, bytearray(data))
 
     def write_data(self, data):
         self.cd(1)
-        self.spi.write(self.cs, bytearray(data))
+        self.spi.exchange(self.cs, bytearray(data))
 
     def set_window(self, x1, y1, x2, y2):
         self.write_command([0x15, x1, x2, 0x75, y1, y2])
