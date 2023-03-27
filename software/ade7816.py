@@ -126,18 +126,18 @@ class ADE7816:
         '8S': (1, True),  # signed 8-bit value
         }
 
-    def __init__(self, spi, cs_name):
+    def __init__(self, spi, cs_pin):
         """
         Parameters:
 
             spi (SPI_with_CS): instance of the SPI_with_CS interface object
 
-            cs_name (str): name of the SPI device as found in the `spi` object.
+            cs_pin (machine.Pin): Pin that controls the display chip select line. Mode must be set by the user.
 
         """
 
         self.spi = spi
-        self.cs_name = cs_name
+        self.cs_pin = cs_pin
         self.cmd = bytearray(3+4)  # command & data bytes
         self.rx_buf = bytearray(4) # reply word
 
@@ -168,7 +168,7 @@ class ADE7816:
         cmd[0] = 1
         cmd[1] = addr >> 8
         cmd[2] = addr & 0xff
-        self.spi.exchange(self.cs_name, memoryview(cmd)[:3], memoryview(rx_buf)[:length])
+        self.spi.exchange(self.cs_pin, memoryview(cmd)[:3], memoryview(rx_buf)[:length])
         return int.from_bytes(rx_buf[:length], 'big') - signed_offset
 
     def write_reg(self, name, value):
@@ -190,7 +190,7 @@ class ADE7816:
         cmd[1] = addr >> 8
         cmd[2] = addr & 0xff
         cmd[3:3+length] = value.to_bytes(length, 'big')
-        self.spi.exchange(self.cs_name, memoryview(cmd)[:3+length])
+        self.spi.exchange(self.cs_pin, memoryview(cmd)[:3+length])
  
     def start_dsp(self):
         self.write_reg('RUN', 1)
