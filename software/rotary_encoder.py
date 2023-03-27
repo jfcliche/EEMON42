@@ -1,11 +1,15 @@
 class RotaryEncoder():
-    """ Implement rotary encoder decoding.
+    """ Creates a rotary encoder decoding object connected to `pin_a` and `pin_b` and sets the interrupt on these pins
+    to continuously keep track of the encoder movements.
 
     The rotary encoder sequence for the two encoder pins is 11, 01, 00, 10, 11 for clockwise rotation, 
     and the sequence is in the opposite direction for counterclockwise rotation.
     The detent (stable state) is on 11.
 
     The encoder position is stored in `self._value` and is accessed with `self.value()`. 
+
+    The decoding is performed by the Pin interrupt handler `process_state()` which should be called when the state of
+    either of the encoder pin changes.
 
     Principle of operation: each each time we call `process_state()`, we increment the `sub_incr` counter by the direction of
     movement (+1, -1) obtained from the previous and current encoder state. If the current encoder lands in its detent
@@ -20,20 +24,22 @@ class RotaryEncoder():
     Parameters:
 
         pin_a, pin_b (machine.Pin): Pins connected to the rotary encoder.
-            These pins must already have been configured properly, and an
-            interrupt pointing to `process_state` must have been set on both pins.
+            These pins must already have been configured properly.
+
+        irq_wrapper (fn): If specified, wraps the Pin interrupt handler that tracks
+            encoder movements. 
 
         verbose (int): verbose level for testing
 
     """
 
     # Direction table: maps the previous and current encoder pin values (Aprev Bprev Acur Bcur) to the direction of the
-    # rotation. Values in parentheses and invalid changes (2 phase jumps = > ambiguous sign).
+    # rotation. Values in parentheses indicate invalid changes (2 phase jumps = > ambiguous sign).
     dir_table = [
         0, -1, 1, (0), 1, 0, (0), -1,  # 0000, 0001, 0010, 0011, 0100, 0101, 0110, 0111
         -1, (0), 0, 1, (0), 1, -1, 0  # 1000, 1001, 1010, 1011, 1100, 1101, 1110, 1111
         ]
-    def __init__(self, pin_a, pin_b, verbose=2):
+    def __init__(self, pin_a, pin_b, irq_wrapper=None, verbose=2):
         self.pin_a = pin_a
         self.pin_b = pin_b
         self._value = 0  # final encoder position 
@@ -41,6 +47,14 @@ class RotaryEncoder():
         self.sub_incr = 0  # tracks cumulative phase increments between detents
         self.invalid = 0  # number of invalid state changes
         self.verbose = verbose
+
+        # Set rotary encoder pins IRQ callback to the encoder handler so it can keep track of pin level changes. 
+        # Use process_state() unless a custom handler is provided 
+
+        irq_handler = irq_wrapper(self.proces_state) if irq_wrapper else self.process_state;
+        self.pin_cs0_rota.irq(irq_handler) 
+        self.pin_cs0_rotb.irq(irq_handler)
+
     def value(self):
         return self._value
 
