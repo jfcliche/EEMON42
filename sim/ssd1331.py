@@ -1,9 +1,15 @@
 import pygame
 
 
-class Display:
+class SSD1331:
 
-    def __init__(self, surface: pygame.surface.Surface):
+
+    def __init__(self, *args, **kwargs):
+        self.surface = None  # will be defined by set_surface() call.
+
+
+
+    def set_surface(self, surface):
         self.surface = surface
 
     def clear(self, x1: int = 0, y1: int = 0, x2: int = 95, y2: int = 63) -> None:
