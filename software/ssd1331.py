@@ -24,6 +24,7 @@ class SSD1331:
         self.cd = cd_pin
         self.res = res_pin
 
+    def init(self):
         self.write_command((
             0xAE,        # Display off
             # Seg remap = 0b01110010 A[7:6]=01:64k color, A[5]=1 COM splip odd-even, A[4]=1 Scan com, A[3]=0, A[2]=0, A[1]=1, A[0]=0
