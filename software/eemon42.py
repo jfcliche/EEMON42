@@ -99,8 +99,17 @@ class EEMON42:
         # Create the 7 energy monitor handlers
         self.emon = [ADE7816(spi=self.spi, cs_pin=cs_pin) for cs_pin in dual_fn_pins]
 
+
+        # initialize display
+        self.display.reset()
+        self.display.init()
+        self.display.clear()
+
         # Create the GUI (display + buttons, menu system etc) handler
         self.gui = GUI(self.display, self.rot_enc, self.button_rot, self.button_a, self.button_b, self.button_c)
+
+        self.gui.draw_text(0, 0, "EEMON42", 255, 255, 0)
+
 
 
     async def start_wifi_client(self):

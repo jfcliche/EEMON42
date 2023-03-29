@@ -113,9 +113,8 @@ class GUI:
     async def run(self):
         """ Runs the GUI. This starts the top level interface.
         """
-
-        self._display.clear()
-        self.draw_text(0, 0, "EEMON42", 255, 255, 0)
+        # self._display.clear()
+        # self.draw_text(0, 0, "EEMON42", 255, 255, 0)
 
         # Create status bar
         # start task to update status bar
