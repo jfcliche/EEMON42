@@ -91,10 +91,10 @@ class EEMON42:
             verbose=0)
 
         # Button handlers
-        self.button_rot = Button(self.pin_cs2_button_rot)
-        self.button_a = Button(self.pin_cs3_button_a)
-        self.button_b = Button(self.pin_cs4_button_b)
-        self.button_c = Button(self.pin_cs5_button_c)
+        self.button_rot = Button(self.pin_cs2_button_rot, irq_wrapper=self.spi.get_irq)
+        self.button_a = Button(self.pin_cs3_button_a, irq_wrapper=self.spi.get_irq)
+        self.button_b = Button(self.pin_cs4_button_b, irq_wrapper=self.spi.get_irq)
+        self.button_c = Button(self.pin_cs5_button_c, irq_wrapper=self.spi.get_irq)
 
         # Create the 7 energy monitor handlers
         self.emon = [ADE7816(spi=self.spi, cs_pin=cs_pin) for cs_pin in dual_fn_pins]

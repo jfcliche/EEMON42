@@ -14,7 +14,7 @@ except ImportError:
 
 
 class Button:
-    def __init__(self, sw, delay=50, tid=4):
+    def __init__(self, sw, delay=50, tid=4, irq_wrapper=None):
         self.sw = sw
         # Create references to bound methods beforehand
         # http://docs.micropython.org/en/latest/pyboard/library/micropython.html#micropython.schedule
@@ -24,8 +24,11 @@ class Button:
         self._value = 0
         self._delay = delay
         self._tim = Timer(tid)
-        self._set_callback(self._callback, None)
-
+        # self._set_callback(self._callback, None)
+        if irq_wrapper:
+            self.sw.irq(irq_wrapper(self._callback))
+        else:
+            self.sw.irq(self._callback)
     def _sw_cb(self, pin=None):
         self._set_cb(None)
         timer_init(self._tim, self._delay, self._tim_cb)
@@ -44,6 +47,7 @@ class Button:
 
     def _callback(self, a):
         self._value += 1
+        print(f'Button {a} value={self._value}')
 
     def value(self):
         ret_value = self._value
