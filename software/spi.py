@@ -40,6 +40,7 @@ class SPI_with_CS(SPI):
 
     """
     def __init__(self, baudrate=2.5e6, sck=None, mosi=None, miso=None, cs_out_pins=tuple(), cs_inout_pins=tuple()):
+        SPI(1).deinit() # need to deinitialize so we can initialize again
         super().__init__(1, int(baudrate))
         # self.init(baudrate=int(baudrate), sck=sck, mosi=mosi, miso=miso)
         self.cs_inout_pins = cs_inout_pins  # list of input-output (dual function) CS pins
