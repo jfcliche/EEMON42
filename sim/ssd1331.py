@@ -5,9 +5,14 @@ class SSD1331:
 
 
     def __init__(self, *args, **kwargs):
-        self.surface = None  # will be defined by set_surface() call.
+        # self.surface = None  # will be defined by set_surface() call.
+        pass
 
+    def reset(self):
+        pass
 
+    def init(self):
+        pass
 
     def set_surface(self, surface):
         self.surface = surface

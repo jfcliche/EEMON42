@@ -70,7 +70,7 @@ class EEMON42Sim(EEMON42):
         self.board = pygame.image.load("eemon42.png")
         pygame.display.set_caption("EEMON42 Simulator")
         self.screen = pygame.display.set_mode(self.board.get_size())
-        self.surface = pygame.surface.Surface((96, 64))
+        SSD1331.surface = self.surface = pygame.surface.Surface((96, 64))
 
 
         # Initialize the original EEMON42
