@@ -29,9 +29,8 @@ class Button:
     """
     def __init__(self, sw, delay=50, irq_wrapper=None):
         self.sw = sw
-        self._delay = delay
-        self.last_time_0 = 0
-        self.last_time_1 = 0
+        self.delay = delay
+        self.last_time = 0
         self._value = 0
         self.last_state = 1
         if irq_wrapper:
@@ -49,17 +48,19 @@ class Button:
         """
         v = pin.value() # get button state ASAP
         t = time.ticks_ms()
-        print(f'Button {pin}= {self.last_state}->{v} dt0={time.ticks_diff(t, self.last_time_0)}')
+        # if verbose:
+        #     print(f'Button {pin}= {self.last_state}->{v} dt0={time.ticks_diff(t, self.last_time)}')
         # Ignore pin state changes if we are in the bounce rejecting window
-        if time.ticks_diff(t, self.last_time_0) > self._delay:
+        if time.ticks_diff(t, self.last_time) > self.delay:
             # if we detect a pin value change compared to the latest known state, restart the bounce reject window, check if it is a button-down event, and store the new button state. 
             if v != self.last_state:
                 # Restart the bounce reject window
-                self.last_time_0 = t  
+                self.last_time = t  
                 # Check if this is a  button down event (1 to 0). If so, register the event.
                 if not v and self.last_state:
                         self._value += 1
-                        print(f'                     Button {pin} value={self._value}')
+                        # if verbose:
+                        #     print(f'                     Button {pin} value={self._value}')
                 # store the new state
                 self.last_state = v
 
