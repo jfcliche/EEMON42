@@ -213,6 +213,16 @@ class EEMON42:
         self.spi.deinit()
         self.spi = None
 
+    async def screen_saver(self, timeout=10):
+        while True:
+            t = time.time() - self.rot_enc.last_time - timeout
+            if t > 0:
+                self.display.clear()
+            # elif t > 0:
+            #     self.display.set_master_intensity(0)
+            await asyncio.sleep(1)
+
+
     async def watchdog(self): 
         """ Monitors the system status flags and reset the board if a fatal error is detected
         """
@@ -232,12 +242,14 @@ class EEMON42:
 
         # Start background tasks
         print('Starting background tasks')
-        tasks = (
-            # asyncio.create_task(self.watchdog()), # reboots if there is a fatal error
-            asyncio.create_task(self.start_wifi_client()), # connect wifi
-            asyncio.create_task(self.mqtt_connect_and_subscribe()), # connects MQTT client when wifi is up
-            asyncio.create_task(self.process_mqtt_messages()) # sends MQTT messages when MQTT client is connected
+        task_list = (
+            self.screen_saver(timeout=10), # turn off the display after `timeout`
+            # self.watchdog(), # reboots if there is a fatal error
+            # self.start_wifi_client(), # connect wifi
+            # self.mqtt_connect_and_subscribe(), # connects MQTT client when wifi is up
+            # self.process_mqtt_messages() # sends MQTT messages when MQTT client is connected
             );
+        tasks = [asyncio.create_task(t) for t in task_list]
 
         # Start GUI
         print('Starting GUI')
