@@ -39,10 +39,14 @@ class GUI:
         return self._button_c
 
     def draw_text(self, x, y, text, r=255, g=255, b=255, bg_r=0, bg_g=0, bg_b=0):
+        """ Displays a single line of text"""
+        disp = self._display
         for c in text:
-            self._display.draw_8x8_mono_bitmap(
-                x * 8, y * 8, font[ord(c)], r, g, b, bg_r, bg_g, bg_b)
+            cc = ord(c) << 3
+            disp.draw_8x8_mono_bitmap2(
+                x * 8, y * 8, font[cc: cc+8], r, g, b, bg_r, bg_g, bg_b)
             x += 1
+        disp.write_frame_buffer()
 
     async def text_input(self, x, y, max_nb_characters):
         """ Allows the user to enter a string
@@ -99,7 +103,7 @@ class GUI:
             if rot_enc_value != last_rot_enc_value:
                 incr = rot_enc_value - last_rot_enc_value
                 last_rot_enc_value = rot_enc_value
-                print(f'encoder={rot_enc_value}, incr={incr}')
+                # print(f'encoder={rot_enc_value}, incr={incr}')
                 char = chr(min(max(ord(char) + incr, 32), 127))
                 draw_char()
             await asyncio.sleep(0.1)

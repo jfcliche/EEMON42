@@ -1,3 +1,5 @@
+import time
+
 class RotaryEncoder():
     """ Creates a rotary encoder decoding object connected to `pin_a` and `pin_b` and sets the interrupt on these pins
     to continuously keep track of the encoder movements.
@@ -54,6 +56,7 @@ class RotaryEncoder():
         irq_handler = irq_wrapper(self.process_state) if irq_wrapper else self.process_state;
         self.pin_a.irq(irq_handler) 
         self.pin_b.irq(irq_handler)
+        self.last_time = time.time()
 
     def value(self):
         return self._value
@@ -90,3 +93,4 @@ class RotaryEncoder():
             self.sub_incr = self.invalid = 0 # start anew
         if self.verbose and self._value != old_counter: 
             print(f'value={self._value}')
+        self.last_time = time.time()
