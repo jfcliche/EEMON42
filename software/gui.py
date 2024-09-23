@@ -4,49 +4,57 @@ if sys.implementation.name == 'micropython':
 else:
     import asyncio
 
-from font import font
 from text_input import TextInput
 
 
 class GUI:
 
     def __init__(self, display, rot_enc, button_rot, button_a, button_b, button_c):
-        self._display = display
-        self._rot_enc = rot_enc
-        self._button_rot = button_rot
-        self._button_a = button_a
-        self._button_b = button_b
-        self._button_c = button_c
+        """ Create GUI instance with its hardware objects, but don't initialize anything yet.
 
-        # self._display.clear()
+        Parameters:
 
-    def display(self):
-        return self._display
+            display (Display): Object representing the display
 
-    def rot_enc(self):
-        return self._rot_enc
+            rot_enc (RotaryEncoder): Object representing the rotary encoder knob
 
-    def button_rot(self):
-        return self._button_rot
+            button_rot (Button): Object representing the rotary encoder shaft pushbutton (acting as ENTER)
 
-    def button_a(self):
-        return self._button_a
+            button_a (Button): Object representing button A (acting as BACKSPACE)
 
-    def button_b(self):
-        return self._button_b
+            button_b (Button): Object representing button B (acting as )
 
-    def button_c(self):
-        return self._button_c
+            button_c (Button): Object representing button C (acting as ESCAPE/BACK)
+        """
+        self.display = display
+        self.rot_enc = rot_enc
+        self.button_rot = button_rot
+        self.button_a = button_a
+        self.button_b = button_b
+        self.button_c = button_c
 
-    def draw_text(self, x, y, text, r=255, g=255, b=255, bg_r=0, bg_g=0, bg_b=0):
-        """ Displays a single line of text"""
-        disp = self._display
-        for c in text:
-            cc = ord(c) << 3
-            disp.draw_8x8_mono_bitmap2(
-                x * 8, y * 8, font[cc: cc+8], r, g, b, bg_r, bg_g, bg_b)
-            x += 1
-        disp.write_frame_buffer()
+        # default text print position
+        self.text_x = 0
+        self.text_y = 0
+        # self.display.clear()
+
+    def init(self):
+        """ Initializes the display and the GUI.
+        """
+
+        # initialize display
+        self.display.reset() # resets the display control lines
+        self.display.init()  # initializes display operations
+        self.clear() # clear the display
+
+    def clear(self):
+        """ Clear the display (all black)
+        """
+        self.display.clear()
+        self.text_x = 0
+        self.text_y = 0
+    def draw_text(self, *args, **kwargs):
+        self.display.print(*args, **kwargs)
 
     async def text_input(self, x, y, max_nb_characters):
         """ Allows the user to enter a string
@@ -69,37 +77,37 @@ class GUI:
             (str): text that was entered
 
         """
-        last_rot_enc_value = self.rot_enc().value()
+        last_rot_enc_value = self.rot_enc.value()
         char = 'A'  # current character
         text = ""
         def draw_char():
-            self.draw_text(x,y, char, 0, 255, 0)
+            self.display.print(char, x,y, fg=self.display.GREEN, bg=self.display.BLACK)
         def draw_inv_char():
-            self.draw_text(x,y, char, 0, 0, 0, 0, 255, 0)
+            self.display.print(char, x,y, fg=self.dispay.BLACK, bg=self.display.GREEN)
 
-        self.draw_text(x, y, "_" * max_nb_characters)  # clear editing zone
+        self.display.print("_" * max_nb_characters, x=x, y=y)  # clear editing zone
         draw_char()
         while True:
             # Add character if encoder button is pressed
-            if self.button_rot().value() > 0 and len(text) < max_nb_characters:
+            if self.button_rot.value() > 0 and len(text) < max_nb_characters:
                 draw_char()
                 text += char
-                x += 1
+                x += self.display.font_width
                 draw_inv_char()
 
             # Remove current character when button a is pressed (BACKSPACE)
-            if self.button_a().value() > 0 and len(text) > 0:
+            if self.button_a.value() > 0 and len(text) > 0:
                 text = text[:-1]
-                self.draw_text(x, y, " ")
-                x -= 1
+                self.display.print(" ", x, y)
+                x -= self.display.font_width
                 draw_inv_char()
 
             # return the text when button C is pressed (ENTER)
-            if self.button_c().value() > 0:
+            if self.button_c.value() > 0:
                 break
 
             # Update selected character when rotary encoder moves 
-            rot_enc_value = self.rot_enc().value()
+            rot_enc_value = self.rot_enc.value()
             if rot_enc_value != last_rot_enc_value:
                 incr = rot_enc_value - last_rot_enc_value
                 last_rot_enc_value = rot_enc_value
@@ -117,7 +125,7 @@ class GUI:
     async def run(self):
         """ Runs the GUI. This starts the top level interface.
         """
-        # self._display.clear()
+        # self.display.clear()
         # self.draw_text(0, 0, "EEMON42", 255, 255, 0)
 
         # Create status bar
@@ -126,6 +134,6 @@ class GUI:
         # start first menu
         try:
             while True:
-                print(await self.text_input(0, 1, 8))
+                print(await self.text_input(0, 10, 8))
         finally:
             print('GUI is terminated')
