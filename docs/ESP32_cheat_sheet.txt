@@ -1,0 +1,67 @@
+ESP32 cheat sheet
+
+
+Flash Micropython
+-------------------
+
+Download image from https://micropython.org/download/ESP32_GENERIC_C3/
+
+See notes below.
+
+If using the board for the first time, it is recommended to erase the flash::
+
+	esptool.py --chip esp32c3 --port /dev/ttyUSB0 erase_flash
+
+Flash Micropython:
+
+	esptool.py --port /dev/ttyACM0 write_flash -z 0x0 ESP32_GENERIC_C3-20240602-v1.23.0.bin
+
+We are currently using: ``ESP32_GENERIC_C3-20240602-v1.23.0.bin``
+
+Older version that worked: 
+
+- ``esp32c3-usb-20220618-v1.19.1.bin``
+
+
+
+Notes:
+
+	- There does not seem to be a distinction anymore between the USB and non-USB version.
+	- 2024-09-16: Tried the C3 Mini micropython firmware (LOLIN_C3_MINI-20240602-v1.23.0.bin) as the hardware also has a direct USB connection, but the EEMON42 display would stay blank even if micropython was running. Maybe 
+rshell
+------
+
+
+Open rshell::
+
+	rshell -p /dev/ttyACM0
+
+rshell commands::
+
+	repl: Enter python
+		Ctrl-X: Exit python (to rshell)
+		Ctrl-B: Reboot python
+
+	rsync . /pyboard
+
+
+esptool
+-------
+
+Test stub once micropython runs
+
+esptool.py --port /dev/ttyACM0 --chip esp32c3 chip_id
+4.5.1 doe4s not work
+4.6 does not work
+4.7.dev1 no
+
+
+ipython
+-------
+
+Read register
+
+from machine import mem32
+read: mem32[addr]
+write: mem32[addr] = val
+

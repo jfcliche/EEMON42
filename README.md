@@ -62,7 +62,7 @@ The EEMON42 was developed as personal project for learning all the steps to buil
 v1 hardware:
   - GPIO9 can be pull down and prevent micropython boot if encoder is left in mid-position
   - Missing GPIO2 & GPIO8 pullup (but still works without those)
-  - A reset swwitch would be nice, but is becoming les and less necessary as hardware matures
+  - A reset switch would be nice, but is becoming les and less necessary as hardware matures
   - A power LED would prevent accidental soldering on a powered board...
   - Pad and copper pour cleareaces too small close to USB connector: rookie solderers might cause shorts when applying too much solder...
   - serial number chip (or some GPIO strapping) might be useful for software to identify the hardware automatically. rev2 GPIOs assignments will change.  
@@ -71,7 +71,7 @@ v1 hardware:
 
 # Changelog:
 
- v2 hardware (in development):
+ v2 hardware (under development):
   - OLED CS7 is now on FSPICS0 for native hardware-enabled CS toggling (if possible)
   - Encoder Button CS2 is on GPIO9 to prevent unwanted boot mode and allow user-controlled to force downnloader boot (although USB interface does not need it except for esptool bug)
   - CS0 and CS1 moved to other GPIOs
