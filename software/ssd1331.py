@@ -1,8 +1,12 @@
-import random
-import time
-from font import font
 
-class SSD1331:
+# PyPi packages
+import time
+
+# Local packages
+from display import Display
+
+
+class SSD1331(Display):
     """ Object to operate SSD1331-based OLED displays via its SPI interface
 
     Parameters:
@@ -17,19 +21,23 @@ class SSD1331:
 
     """
 
+    WIDTH = 96
+    HEIGHT = 64
+    BYTES_PER_PIXEL = 2
+
     def __init__(self, spi, cs_pin, cd_pin, res_pin):
 
+        super().__init__()
         self.spi = spi
-        self.cs = cs_pin
-        self.cd = cd_pin
-        self.res = res_pin
-        self.fb = memoryview(bytearray(96*64*2)) # command+frame buffer, 2 bytes per pixel, + 6 bytes for the set window function
-        self.buf = bytearray((0x15, 0, 95, 0x75, 0, 63))
-        self.fb_y0 = 0  # current lowest modified frame buffer line
-        self.fb_y1 = 63  # current highest modified frame buffer line
-        # self.fg = bytearray(2)
-        # self.bg = bytearray(2)
+        self.cs_pin = cs_pin
+        self.cd_pin = cd_pin
+        self.rst_pin = res_pin
+        self.cmd = bytearray((0x15, 0, 95, 0x75, 0, 63)) # command bytes. The last two bytes are updated as needed
+        
+
     def init(self):
+        """ Initializes the display controller to the desired display mode
+        """
         self.write_command((
             0xAE,        # Display off
             # Seg remap = 0b01110010 A[7:6]=01:64k color, A[5]=1 COM splip odd-even, A[4]=1 Scan com, A[3]=0, A[2]=0, A[1]=1, A[0]=0
@@ -52,11 +60,15 @@ class SSD1331:
 
         self.write_command((0x26, 1))  # Enable rectangle fill
 
-    def reset(self):
+        super().init()
 
-        self.res(0)
+    def reset(self):
+        """ Pulses the hardware reset line of the display
+        """
+
+        self.rst_pin(0)
         time.sleep(0.01)
-        self.res(1)
+        self.rst_pin(1)
         time.sleep(0.01)
         # All the display needs to be refreshed
         self.fb_y0 = 0
@@ -72,8 +84,8 @@ class SSD1331:
                 string or bytearray.
 
         """
-        self.cd(0)
-        self.spi.exchange(self.cs, bytearray(data))
+        self.cd_pin(0)
+        self.spi.exchange(self.cs_pin, bytearray(data))
 
     def _write_command(self, data):
         """ Writes data bytes
@@ -82,38 +94,45 @@ class SSD1331:
 
             data (bytes, bytearray or memoryview): bytes to send to the display.
         """
-        self.cd(0)
-        self.spi.exchange(self.cs, data)
+        self.cd_pin(0)
+        self.spi.exchange(self.cs_pin, data)
 
     def write_data(self, data):
-        self.cd(1)
-        self.spi.exchange(self.cs, bytearray(data))
+        self.cd_pin(1)
+        self.spi.exchange(self.cs_pin, bytearray(data))
 
     def _write_data(self, data):
         """ Assumes data is already a bytearray or buffer"""
-        self.cd(1)
-        self.spi.exchange(self.cs, data)
+        self.cd_pin(1)
+        self.spi.exchange(self.cs_pin, data)
 
-    def write_frame_buffer(self, y0=None, y1=None, cmd=0xAF):
+    def write_frame_buffer(self, y0=None, y1=None):
+        """ Sends the specified lines of the frame buffer to the hardware display. 
+
+        If no lines are specified, only the block of lines that were modified since the last call are updated. 
+
+        Parameters:
+
+            y0, y1 (int): first and last line of the block to be updated. If None, the higest/lowest line modified since the last call is used.  
+
+        """
         # sets the window
-        self.buf[4] = y0 = y0 if y0 is not None else self.fb_y0
-        self.buf[5] = y1 = y1 if y1 is not None else self.fb_y1
+        self.cmd[4] = y0 = y0 if y0 is not None else self.fb_y0
+        self.cmd[5] = y1 = y1 if y1 is not None else self.fb_y1
         if y1 < 0:
             return
         with self.spi:
-            self.write_command((cmd,)) 
-            self._write_command(self.buf) # send the window command
-            self._write_data(self.fb[y0*96*2: (y1+1)*96*2]) # fb is a memoryview, indexing does not allocate new memory
-        self.fb_y0=63
-        self.fb_y1=-1 # -1 is faster to check than y0 > y1
+            self._write_command(self.cmd) # send the window command
+            self._write_data(self.fb[y0 * self.BYTES_PER_LINE: (y1+1) * self.BYTES_PER_LINE]) # fb is a memoryview, indexing does not allocate new memory
+        self.fb_y0 = self.HEIGHT - 1
+        self.fb_y1 = -1 # -1 is faster to check than y0 > y1
 
-    def clear_frame_buffer(self):
-        zeros = bytearray(96*2) # preallocate a bunch of zeros for efficiency
-        for j in range(64):
-            a= 96*2*j
-            self.fb[a:a+96*2] = zeros
-        self.fb_y0 = 0
-        self.fb_y1 = 63
+        # tb = time.ticks_cpu()
+        # t1 = time.ticks_ms()
+        # self.write_frame_buffer(y, y+7)
+        # t2= time.ticks_ms()
+        # print(f'draw={t1-t0} ms, refresh={t2-t1} ms, buf access={tb-ta} cycles')
+
 
     def set_window(self, x1, y1, x2, y2):
         self.write_command([0x15, x1, x2, 0x75, y1, y2])
@@ -126,62 +145,28 @@ class SSD1331:
             b = d & 0b11111
             self.write_data([r << 3 | (g & 0b111), (g & 0b111) | b << 3])
 
-    def draw_8x8_mono_bitmap(self, x: int, y: int, data: list, r: int = 255, g: int = 255, b: int = 255, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0) -> None:
-        self.set_window(x, y, x + 7, y + 7)
-        index = 0
-        rr = r >> 3
-        gg = g >> 2
-        bb = b >> 3
-        bg_rr = bg_r >> 3
-        bg_gg = bg_g >> 2
-        bg_bb = bg_b >> 3
-        cmds_fg = [rr << 3 | (gg & 0b111), (gg & 0b111) | bb << 3]
-        cmds_bg = [bg_rr << 3 | (bg_gg & 0b111), (bg_gg & 0b111) | bg_bb << 3]
-        for j in range(8):
-            d = data[index]
-            for i in range(8):
-                bit = d & 0x80
-                if bit != 0x00:
-                    self.write_data(cmds_fg)
-                else:
-                    self.write_data(cmds_bg)
-                d <<= 1
-            index += 1
+    # def draw_8x8_mono_bitmap(self, x: int, y: int, data: list, r: int = 255, g: int = 255, b: int = 255, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0) -> None:
+    #     self.set_window(x, y, x + 7, y + 7)
+    #     index = 0
+    #     rr = r >> 3
+    #     gg = g >> 2
+    #     bb = b >> 3
+    #     bg_rr = bg_r >> 3
+    #     bg_gg = bg_g >> 2
+    #     bg_bb = bg_b >> 3
+    #     cmds_fg = [rr << 3 | (gg & 0b111), (gg & 0b111) | bb << 3]
+    #     cmds_bg = [bg_rr << 3 | (bg_gg & 0b111), (bg_gg & 0b111) | bg_bb << 3]
+    #     for j in range(8):
+    #         d = data[index]
+    #         for i in range(8):
+    #             bit = d & 0x80
+    #             if bit != 0x00:
+    #                 self.write_data(cmds_fg)
+    #             else:
+    #                 self.write_data(cmds_bg)
+    #             d <<= 1
+    #         index += 1
 
-    def draw_8x8_mono_bitmap2(self, x: int, y: int, data: list, r: int = 255, g: int = 255, b: int = 255, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0) -> None:
-        """ Writes a 8x8 monochrome bitmap in the frame buffer 
-
-
-        """
-        # t0 = time.ticks_ms()
-        fb = self.fb
-        fg0 = r & 0b11111000 | (g >> 5) & 0b111
-        fg1 = (g << 3) & 0b11100000 | (b >> 3)  & 0b11111
-        bg0 = bg_r & 0b11111000 | (bg_g >> 5) & 0b111
-        bg1 = (bg_g << 3) & 0b11100000 | (bg_b >> 3) & 0b11111
-        addr = (x + y*96)*2
-        # ta = time.ticks_cpu()
-        for j in range(8):
-            d = data[j]
-            a = addr
-            for i in range(8):
-                if (d & (0x80 >> i)):
-                    fb[a] = fg0; a +=1
-                    fb[a] = fg1; a +=1
-                else:
-                    fb[a] = bg0; a +=1
-                    fb[a] = bg1; a +=1
-            addr += 96*2
-        # expand the refresh zone to include modified lines
-        self.fb_y0 = min(self.fb_y0, y)  
-        self.fb_y1 = max(self.fb_y1, y+7)  
-
-        # tb = time.ticks_cpu()
-        # t1 = time.ticks_ms()
-        # self.write_frame_buffer(y, y+7)
-        # t2= time.ticks_ms()
-        # print(f'draw={t1-t0} ms, refresh={t2-t1} ms, buf access={tb-ta} cycles')
-    # Graphic acceleration commands
 
     def test_text(self,r=255, g=255, b=255):
         self.clear_frame_buffer()
@@ -222,12 +207,26 @@ class SSD1331:
 
     def set_dim(self, dim=255):
         """ Sets the display dim level.
+
+        The dim command seems to erase the display memory, so the frame buffer has to be sent back.
+        This causes flicker.
+        We cannot completely extinguish the pixels with dim=0.
         """
         self.write_command((0xAB, 0, dim,dim,dim,31))
         self.write_frame_buffer(0, 63, cmd=0xAC)
         # self.write_command((0xAC, ))
 
-    def clear(self, x1=0, y1=0, x2=95, y2=63):
+    def clear_display(self, x1=0, y1=0, x2=WIDTH-1, y2=HEIGHT-1):
+        """ Clears the display's pixels in the specified rectangle coordinates.
+
+        This operates on the display directly, using the hardware clear command. 
+        The frame buffer is unaffected.
+        If no arguments are provided, the whole display is cleared. 
+
+        Parameters:
+
+            x1, y1, x2, y2 (int): coordinates of the rectangles to be cleared 
+        """
         self.write_command((0x25, x1, y1, x2, y2))
         time.sleep(0.001)
         # All the display needs to be refreshed
