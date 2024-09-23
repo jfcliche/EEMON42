@@ -35,6 +35,8 @@ class EEMON42:
 
 
     def __init__(self):
+        """ Create EEMON42 hardware objects
+        """
 
         self.config = None
         self.spi = None
@@ -58,10 +60,12 @@ class EEMON42:
         self.pin_cs0_rota = Pin(10)
         self.pin_cs1_rotb = Pin(9)
         self.pin_cs2_button_rot = Pin(8)
-        self.pin_cs3_button_a = Pin(5)
-        self.pin_cs4_button_b = Pin(4)
-        self.pin_cs5_button_c = Pin(3)
+        self.pin_cs3_button_a = Pin(3)
+        self.pin_cs4_button_b = Pin(5)
+        self.pin_cs5_button_c = Pin(4)
         self.pin_cs6_irq = Pin(21)
+
+        # List of pins that are used *both* for buttton/encoder/irq inputs and energy monitor chip select outputs
         dual_fn_pins = (self.pin_cs0_rota, 
                         self.pin_cs1_rotb,
                         self.pin_cs2_button_rot,
@@ -97,18 +101,34 @@ class EEMON42:
         self.button_c = Button(self.pin_cs5_button_c, irq_wrapper=self.spi.get_irq)
 
         # Create the 7 energy monitor handlers
-        self.emon = [ADE7816(spi=self.spi, cs_pin=cs_pin) for cs_pin in dual_fn_pins]
+        self.emon = [ADE7816(spi=self.spi, cs_pin=cs_pin, irq_pin=self.pin_cs6_irq, irq_wrapper=self.spi.get_irq, index=ix) 
+                     for ix, cs_pin in enumerate(dual_fn_pins)]
 
+        self.pin_cs6_irq.irq(handler=self.spi.get_irq(self.emon_irq_handler));
+         
 
-        # initialize display
-        self.display.reset()
-        self.display.init()
-        self.display.clear()
 
         # Create the GUI (display + buttons, menu system etc) handler
         self.gui = GUI(self.display, self.rot_enc, self.button_rot, self.button_a, self.button_b, self.button_c)
 
-        self.gui.draw_text(0, 0, "EEMON42", 255, 255, 0)
+
+        print('Loading configuration file')
+        if not self.load_config():
+            print("Unable to load the configuration")
+            return
+
+    def emon_irq_handler(self, pin):
+        print(f'Got pin IRQ!')
+        if False:
+            for e in self.emon:
+                e.irq_handler()
+
+    def init(self):
+        self.display.print("EEMON42\r\nis\r\nthe\r\nbest\nof\nall", fg=self.display.YELLOW, font_size=5)
+        for e in self.emon:
+            e.init()
+        time.sleep(1)
+        self.display.clear()
 
 
 
@@ -231,19 +251,42 @@ class EEMON42:
                 self.restart_and_reconnect()
             await asyncio.sleep(1)
 
+    async def scan_emon(self):
+        ch = 0;
+        ch_max = len(self.emon) - 1
+        while True:
+            try:
+                # for ix, e in enumerate(self.emon):
+                #     f = e.get_frequency()
+                #     print(f'CH{ix} = {f} Hz')
+
+                #     for ch in range(1):
+                #         i = e.get_rms_current(ch)
+                #         print(f'CH{ix}.{ch} = {i:.3f} A RMS')
+                #         if not ch:
+                #             self.display.print(f'CH{ix} = {i:.3f} A RMS', x=0, y=ix*self.display.font_height)
+                while not self.pin_cs6_irq():
+                    if self.emon[ch].irq_handler(self.pin_cs6_irq):
+                        ch = ch + 1 if ch < ch_max else 0
+                    await asyncio.sleep(0) 
+                print('.', end='')
+                await asyncio.sleep(0.1)
+            except Exception as e:
+                print(f'scan_emon exception {e}')
+                raise
     async def main_loop(self):
+
+        self.init()
+
         print('Starting main loop')
 
 
-        print('Loading configuration file')
-        if not self.load_config():
-            print("Unable to load the configuration")
-            return
-
+ 
         # Start background tasks
         print('Starting background tasks')
         task_list = (
             self.screen_saver(timeout=10), # turn off the display after `timeout`
+            self.scan_emon(),
             # self.watchdog(), # reboots if there is a fatal error
             # self.start_wifi_client(), # connect wifi
             # self.mqtt_connect_and_subscribe(), # connects MQTT client when wifi is up
