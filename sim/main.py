@@ -16,14 +16,9 @@ sys.modules['ustruct'] = struct
 sys.modules['ubinascii'] = binascii
 
 # local imports
-# from gui import GUI
-# from display import Display
-# from rotary import RotaryEncoder
-# from button import Button
-from ssd1331 import SSD1331
-
 from eemon42 import EEMON42
 from button import Button
+from ssd1331 import SSD1331
 
 # SCREEN_SCALE = 4
 
@@ -55,7 +50,7 @@ class EEMON42Sim(EEMON42):
             # Display screen zoom insert, if activated
             if self.zoom_display:
                 self.screen.blit(pygame.transform.scale(
-                    self.surface, (96*2, 64*2)), (0, self.screen.get_rect().bottom-64*2))
+                    self.surface, (SSD1331.WIDTH * 2, SSD1331.HEIGHT * 2)), (0, self.screen.get_rect().bottom-SSD1331.HEIGHT * 2))
 
             # Display widget bounding boxes
             for widget in self.widgets:
@@ -70,7 +65,7 @@ class EEMON42Sim(EEMON42):
         self.board = pygame.image.load("eemon42.png")
         pygame.display.set_caption("EEMON42 Simulator")
         self.screen = pygame.display.set_mode(self.board.get_size())
-        SSD1331.surface = self.surface = pygame.surface.Surface((96, 64))
+        SSD1331.surface = self.surface = pygame.surface.Surface((SSD1331.WIDTH, SSD1331.HEIGHT))
 
 
         # Initialize the original EEMON42
@@ -78,6 +73,9 @@ class EEMON42Sim(EEMON42):
 
         # Pass the surface object to the emulated display instance. 
         self.display.set_surface(self.surface)  
+
+        # initializes the simulated hardware
+        super().init()
 
         # Pass graphical parameters to the emulated button instances
         self.button_rot.set_rect(pygame.Rect(169, 165, 58, 47))
@@ -96,6 +94,12 @@ class EEMON42Sim(EEMON42):
                         self.button_c,
                         self.zoom_button
                         )
+
+        print('Controls:')
+        print('  Use the wheel anywhere to rotate the knob')
+        print('  Click on the buttons or knob to press them')
+        print('  Clock on the screen to show/hide a magnified display')
+
     async def main_loop(self):
         """ Runs the main program loop of the EEMON42, with an additional pygame display handling task.
         """

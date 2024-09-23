@@ -7,6 +7,7 @@ class RotaryEncoder:
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEWHEEL:
+            # print(f'{event.y}')
             self._value += event.y
 
     def value(self):

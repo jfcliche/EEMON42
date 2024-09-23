@@ -1,3 +1,4 @@
+# Emulate micropython machine module with a minimal set of classes that are used in this application
 class Pin:
 	OUT = 1
 	IN = 2
