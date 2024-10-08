@@ -41,10 +41,12 @@ class RotaryEncoder():
         0, -1, 1, (0), 1, 0, (0), -1,  # 0000, 0001, 0010, 0011, 0100, 0101, 0110, 0111
         -1, (0), 0, 1, (0), 1, -1, 0  # 1000, 1001, 1010, 1011, 1100, 1101, 1110, 1111
         ]
-    def __init__(self, pin_a, pin_b, irq_wrapper=None, verbose=2):
+    def __init__(self, pin_a, pin_b, button_shift, irq_wrapper=None, verbose=2):
         self.pin_a = pin_a
         self.pin_b = pin_b
-        self._value = 0  # final encoder position 
+        self.button_shift = button_shift
+        self._value = 0  # Continous count of valid increments/decrements without SHIFT 
+        self._shift_value = 0  # Continous count of valid increments/decrements with SHIFT  
         self.prev_pins = 0b11  # stores the previous encoder pin state
         self.sub_incr = 0  # tracks cumulative phase increments between detents
         self.invalid = 0  # number of invalid state changes
@@ -56,10 +58,13 @@ class RotaryEncoder():
         irq_handler = irq_wrapper(self.process_state) if irq_wrapper else self.process_state;
         self.pin_a.irq(irq_handler) 
         self.pin_b.irq(irq_handler)
-        self.last_time = time.time()
+        # self.last_time = time.time()
 
     def value(self):
         return self._value
+
+    def shift_value(self):
+        return self._shift_value
 
     def reset(self):
         self._value = 0
@@ -73,6 +78,8 @@ class RotaryEncoder():
 
         """
         pins = (self.pin_a.value() << 1) | self.pin_b.value() # get the two encoder pin values
+        shift = self.button_shift.is_down()
+
         # Do nothing if the encoder pins have not changed. This happens often, 
         # so let's save some CPU cycles by stopping right here. 
         if pins == self.prev_pins: 
@@ -89,8 +96,13 @@ class RotaryEncoder():
         old_counter = self._value  # debug
         if pins == 0b11: # we landed on the detent position. Assess our increment.
             # add sub_incr/4, after adding invalid counts as jumps of 2 in the direction of the valid ones
-            self._value += (self.sub_incr + (self.invalid << 1 if self.sub_incr > 0 else -self.invalid << 1 if self.sub_incr < 0 else 0)) >> 2
+            incr = (self.sub_incr + (self.invalid << 1 if self.sub_incr > 0 else -self.invalid << 1 if self.sub_incr < 0 else 0)) >> 2
             self.sub_incr = self.invalid = 0 # start anew
+            if shift:
+                self._shift_value += incr
+                self.button_shift.clear()
+            else:
+                self._value += incr
         if self.verbose and self._value != old_counter: 
             print(f'value={self._value}')
-        self.last_time = time.time()
+        # self.last_time = time.time()

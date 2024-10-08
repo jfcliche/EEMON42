@@ -25,13 +25,14 @@ class Button:
     in ``self.last_state``. If the value has changed, we store the time of the
     transition and any interrupt hapenning before `delay` are then ignored to
     ignore the flurry of transitions caused by the switch bouncing. If the
-    value of the pin changed from 1 to 0, we increment ``self._value``.
+    value of the pin changed from 1 to 0, we increment ``self._down``.
     """
     def __init__(self, sw, delay=50, irq_wrapper=None):
         self.sw = sw
         self.delay = delay
         self.last_time = 0
-        self._value = 0
+        self._down = 0
+        self._up = 0
         self.last_state = 1
         if irq_wrapper:
             self.sw.irq(irq_wrapper(self.process_irq))
@@ -58,14 +59,35 @@ class Button:
                 self.last_time = t  
                 # Check if this is a  button down event (1 to 0). If so, register the event.
                 if not v and self.last_state:
-                        self._value += 1
-                        # if verbose:
-                        #     print(f'                     Button {pin} value={self._value}')
+                    self._down += 1
+                elif v and not self.last_state:
+                    self._up += 1
+                    # if verbose:
+                    #     print(f'                     Button {pin} value={self._down}')
                 # store the new state
                 self.last_state = v
 
 
     def value(self):
-        ret_value = self._value
-        self._value = 0
+        """ Same as down()
+        """
+        ret_value = self._down
+        self._down = self._up = 0
         return ret_value
+
+    def is_down(self):
+        return not self.sw.value()
+
+    def down(self):
+        ret_value = self._down
+        self._down = self._up = 0
+        return ret_value
+
+
+    def up(self):
+        ret_value = self._up
+        self._down = self._up = 0
+        return ret_value
+
+    def clear(self):
+        self._down = self._up = 0
