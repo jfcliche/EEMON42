@@ -38,6 +38,7 @@ class SSD1331(Display):
     def init(self):
         """ Initializes the display controller to the desired display mode
         """
+        self.reset()
         self.write_command((
             0xAE,        # Display off
             # Seg remap = 0b01110010 A[7:6]=01:64k color, A[5]=1 COM splip odd-even, A[4]=1 Scan com, A[3]=0, A[2]=0, A[1]=1, A[0]=0
@@ -133,9 +134,21 @@ class SSD1331(Display):
         # t2= time.ticks_ms()
         # print(f'draw={t1-t0} ms, refresh={t2-t1} ms, buf access={tb-ta} cycles')
 
+    def display_on(self):
+        self.write_command((0xAF,))
+
+    def display_off(self):
+        self.write_command((0xAE,))
+
+    def _set_brightness(self, brightness):
+        if not brightness:
+            self.write_command((0xAE,))  # display OFF
+        else:
+            self.write_command((0xAF, 0x87, min(15, brightness-1))) # dislay ON, set brightness
+
 
     def set_window(self, x1, y1, x2, y2):
-        self.write_command([0x15, x1, x2, 0x75, y1, y2])
+        self.write_command((0x15, x1, x2, 0x75, y1, y2))
 
     def draw_color_bitmap(self, x, y, width, height, data):
         self.set_window(x, y, x + width - 1, y + height - 1)
@@ -168,17 +181,6 @@ class SSD1331(Display):
     #         index += 1
 
 
-    def test_text(self,r=255, g=255, b=255):
-        self.clear_frame_buffer()
-        self.write_frame_buffer()
-        t0 = time.ticks_ms()
-        for x in range(96):
-            c = 8*(x+32)
-            self.draw_8x8_mono_bitmap2((x % 12) * 8, x//12 * 8, font[c: c+8], r, g, b)
-        t1 = time.ticks_ms()
-        self.write_frame_buffer()
-        t2 = time.ticks_ms()
-        print(f'draw={t1-t0} ms, refresh={t2-t1} ms')
 
     def draw_line(self, x1, y1, x2, y2, r=255, g=255, b=255):
         self.write_command((0x21, x1, y1, x2, y2, r, g, b))
