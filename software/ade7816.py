@@ -155,7 +155,8 @@ class ADE7816:
         self.cmd = bytearray(3+4)  # command & data bytes
         self.rx_buf = bytearray(4) # reply word
         self.index = index
-
+        self.line_frequency = 60 # in Hz
+        self.integ_cycles = self.line_frequency * 5 # amount of integration, in line cycles
         self.ct_cal = 0.312/20 # Vrms/Irms # SCT-013 = 1Vrms/20Irms,100 ohm burden, including divider network and its input impedance, Vout=0.436Vp/20Arms, 
         # irq_handler = irq_wrapper(self.irq_handler) if irq_wrapper else self.irq_handler;
         # self.irq_pin.irq(trigger=Pin.IRQ_FALLING, handler=self.irq_handler) 
@@ -163,7 +164,7 @@ class ADE7816:
         self.vt_cal = 10.8/120 # output volts / input volts (use no-load output voltage value since we are far from full load)
         self.t0 = time.time_ns()
         self.total_energy = 0
-        self.energy_cal = 1.22155 # J/lsb
+        self.energy_cal = 0.519 #1.22155 # J/lsb
         self.energy_count = 0
 
 
@@ -193,9 +194,9 @@ class ADE7816:
         self.write_reg('WTHR1', 0x000002)
         self.write_reg('WTHR0', 0x000000)
         # set reactive energy integration threshold
-        self.write_reg('VARTHR1', 0x000002)
-        self.write_reg('VARTHR0', 0x000000)
-        self.write_reg('LINECYC', 120) # capture data every second
+        self.write_reg('VARTHR1', 0x000000)
+        self.write_reg('VARTHR0', 0x400000)
+        self.write_reg('LINECYC', self.integ_cycles * 2) # integration perion in half cycles
         self.write_reg('LCYCMODE', 0b00001011) # Enable zero crossing detector and line accumulation mode
 
         self.write_reg('MASK0', self.STATUS0_LENERGY) 
@@ -225,19 +226,23 @@ class ADE7816:
         status1 = self.read_reg('STATUS1')        
         lenergy_irq = bool(status0 & self.STATUS0_LENERGY)
         dt = (time.time_ns() - self.t0) / 1e9
-        if True or lenergy_irq:
+        if lenergy_irq:
             energy = self.read_reg('AWATTHR') * self.energy_cal
-            self.total_energy += energy
-            self.energy_count += 1       
+            reactive_energy = self.read_reg('AVARHR') * self.energy_cal
+            angle = self.read_reg('ANGLE0')*360*60/256000
+            current = self.get_current(0)
+            voltage = self.get_voltage()
+            self.total_energy += energy 
+            self.energy_count += 1
+            dt = int(self.integ_cycles * 2) / 2 / self.line_frequency       
+            apparent_energy = current * voltage * dt
+            power_factor = energy / apparent_energy
+            print(f'{dt:.3f} EMON{self.index}: #{self.energy_count}, volt = {voltage:.3f} V, curr={current:.3f} A, '
+                  +f'app = {apparent_energy/dt} VA, act: {energy/dt:.3f} W, react: {reactive_energy/dt:.3f} VAr, angle={angle}, PF={power_factor:.2}, tot act= {self.total_energy/3600} Wh')
             # print(f'{dt:.3f} IRQ={pin()} LENERGY={lenergy_irq} EMON{self.index}: status0={status0:024b}, status1={status1:016b}, AWATTHR={energy} W, tot = {self.total_energy/3600} kWh')
-            print(f'{dt:.3f} EMON{self.index}: {energy} Ws, tot = {self.total_energy/3600} Wh')
-            if lenergy_irq: # clear interrupt only if set, otherwise we might cler an interrupt that occured since we last read and we'll miss it
-                self.write_reg('STATUS0', self.STATUS0_LENERGY)
-        return lenergy_irq
-        # Clear IRQ1
-        # self.write_reg('STATUS0', status0) 
-        # self.write_reg('STATUS1', status1) 
-
+            self.write_reg('STATUS0', self.STATUS0_LENERGY)
+        else:
+            print(f'{dt:.3f} EMON{self.index}: LENERGY flag not set, ignoring')
 
 
     def read_reg(self, name):
