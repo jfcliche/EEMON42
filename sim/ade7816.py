@@ -20,3 +20,6 @@ class ADE7816:
 
     def get_frequency(self):
         return 60
+
+    def irq_handler(self, pin):
+        pass

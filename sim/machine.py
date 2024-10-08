@@ -11,8 +11,11 @@ class Pin:
 		if val is not None:
 			self._value = val
 		return self._value
-	def irq(self, fn):
+	def irq(self, handler):
 		pass
+
+	def __call__(self, *args):
+		self.value(*args)
 
 class SPI:
 	def __init__(self, *args, **kwargs):
