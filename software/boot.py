@@ -4,16 +4,16 @@
 # def spi_test():
 # from ade7816 import ADE7816, test
 # import time
-from eemon42 import EEMON42
-e = EEMON42()
-print('EEMON42')
-print('Press button C while booting to start the GUI')
-if not e.pin_cs5_button_c.value():
-	print('Starting GUI')
-	e.run()
-m = e.emon[0]
-m.init()
-
+# from eemon42 import EEMON42
+# e = EEMON42()
+# print('EEMON42')
+# print('Press button C while booting to start the GUI')
+# if not e.pin_cs5_button_c.value():
+# 	print('Starting GUI')
+# 	e.run()
+# m = e.emon[0]
+# m.init()
+a=1
 # spi, p, rot = test(1000)
  
 # def shift_test():
