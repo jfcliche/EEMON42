@@ -3,7 +3,32 @@ import time
 import font
 
 
+# In-string color code
+# Colors are encoded as R2G2B2 values. 
+# Foreground color codes are ASCII character 128-191, background color codes are ASCII characters 192-255 
+WF = chr(0b10_111111) # White foreground
+RF = chr(0b10_110000) # Red foreground
+GF = chr(0b10_001100) # Green foreground
+BF = chr(0b10_000011) # Blue foreground
+YF = chr(0b10_111100) # Yellow foreground
+CF = chr(0b10_001111) # Cyan foreground
+KF = chr(0b10_000000)  # Black foreground
+
+WB = chr(0b11_111111) # White background
+RB = chr(0b11_110000) # Red background
+GB = chr(0b11_001100) # Green background
+BB = chr(0b11_000011) # Blue background
+YB = chr(0b11_111100) # Yellow background
+CB = chr(0b11_001111) # Cyan background
+KB = chr(0b11_000000)  # Black background
+cB = chr(0b11_000101) # Dark Cyan background
+
+CC = chr(31) # clear color
+
 class Display:
+    """ Frame buffer for R5G5B5 displays. 
+  
+    """
     # Display geometry
     WIDTH = None
     HEIGHT = None
@@ -15,15 +40,27 @@ class Display:
     YELLOW = 0b11111_111111_00000
     GREEN = 0b00000_111111_00000
     BLUE = 0b00000_000000_11111
+    CYAN = 0b00000_111111_11111
+    DARKCYAN = 0b00000_011111_01111
 
-    def __init__(self):
+ 
+
+    def __init__(self, fb=None):
         self.BYTES_PER_LINE = self.WIDTH * self.BYTES_PER_PIXEL
-        self.fb = memoryview(bytearray(self.BYTES_PER_LINE * self.HEIGHT)) # frame buffer, 2 bytes per pixel
+
+        # initialize the frame buffer if one is not alreadyprovided
+        if fb:
+            self.fb  =fb
+        else:
+            self.fb = memoryview(bytearray(self.BYTES_PER_LINE * self.HEIGHT)) # frame buffer, 2 bytes per pixel
+
         self.zeros = memoryview(bytearray(self.BYTES_PER_LINE)) # preallocate a line of zeros for efficiency
 
 
         self.fb_y0 = 0  # current lowest modified frame buffer line
         self.fb_y1 = self.HEIGHT-1  # current highest modified frame buffer line
+        self.cl_y0 = 0
+        self.cl_y1 = self.HEIGHT-1
 
         self.brightness = 0 # dim level: 0= display off, 1: min brightness, 16: max brightness
         self.last_time = time.time()
@@ -41,7 +78,7 @@ class Display:
 
     def init(self):
         self.set_brightness(16)
-        self.clear()
+        self.clear(update=True)
 
 
     def set_brightness(self, brightness=16):
@@ -52,27 +89,63 @@ class Display:
         self._set_brightness(brightness)
         self.brightness = brightness
 
-    def write_frame_buffer(self, y0=None, y1=None):
-        """ Sends the specified lines of the frame buffer to the hardware display.
+    def update(self):
+        """ Sends the invalidated lines of the frame buffer to the display.
 
             This method should be provided by the hardware-specific subclass.
         """ 
         raise NotImplementedError()
 
-    def update(self, y0=None, y1=None):
-        self.write_frame_buffer(y0=y0, y1=y1)
+    def _set_brightness(self, brightness):
+        """ Set the brightness of the display.
 
-    def clear(self, update=True):
-        addr = 0
-        fb = self.fb
-        for j in range(self.HEIGHT):
-            fb[addr: addr + self.BYTES_PER_LINE] = self.zeros
-            addr += self.BYTES_PER_LINE
+        Parameters:
+            brightness (int): brightness value between 0 and 16
+        """
+        raise NotImplementedError()
+
+    def update_all(self):
         self.fb_y0 = 0
         self.fb_y1 = self.HEIGHT - 1
+        self.update()
+
+    # def update(self, y0=None, y1=None):
+    #     self.write_frame_buffer(y0=y0, y1=y1)
+
+    def clear(self, update=False, force=False):
+        fb = self.fb
+        if force:
+            self.fb_y0 = 0
+            self.fb_y1 = self.HEIGHT - 1
+        else:
+            self.fb_y0 = self.cl_y0
+            self.fb_y1 = self.cl_y1
+            if self.cl_y1 < 0:
+                return
+
+        addr = self.fb_y0 * self.BYTES_PER_LINE
+        for j in range(self.fb_y1 - self.fb_y0 + 1):
+            fb[addr: addr + self.BYTES_PER_LINE] = self.zeros
+            addr += self.BYTES_PER_LINE
         self.text_x = self.text_y = 0
         if update:
-            self.write_frame_buffer()
+            self.update()
+        self.cl_y0 = self.HEIGHT - 1
+        self.cl_y1 = -1
+
+    def fill(self, x0, y0, x1, y1, color, update=False):
+        fb = self.fb
+        addr = (x0 + y0 * self.WIDTH) * self.BYTES_PER_PIXEL
+        for j in range(y1 - y0 + 1):
+            a = addr
+            for i in range(x1 - x0 + 1):
+                fb[a] = color >> 8; a +=1
+                fb[a] = color & 0xFF; a +=1
+            addr += self.BYTES_PER_LINE
+        self.fb_y0 = min(self.fb_y0, y0)  
+        self.fb_y1 = max(self.fb_y1, y1) 
+        if update:
+            self.update()
 
     @classmethod
     def encode_color(cls, r, g, b):
@@ -88,6 +161,14 @@ class Display:
         """ 
         return (r & 0b11111000) << 8 | (g & 0b11111100) << 3 | (b >> 3)
 
+    @classmethod
+    def convert_R2G2B2_color(cls, c):
+        """ Convert R2G2B2 color into R5G6B5 color 
+        """
+        return ((0, 0b01010_000000_00000, 0b10100_000000_00000, 0b11111_000000_00000)[(c >> 4) & 0b11] |
+                (0, 0b010101_00000, 0b101010_00000, 0b111111_00000)[(c >> 2) & 0b11] |
+                (0, 0b01010, 0b10100, 0b11111)[c & 0b11])
+
     def hline(self, x0, x1, y, color = WHITE):
         """ Draws an horizontal line in the frame buffer
 
@@ -98,7 +179,7 @@ class Display:
         """
         fb = self.fb
         a = (x0 + y * self.WIDTH) * self.BYTES_PER_PIXEL
-        for i in range(x1 - x0):
+        for i in range(x1 - x0 + 1):
             fb[a] = color >> 8; a +=1
             fb[a] = color & 0xFF; a +=1
         self.fb_y0 = min(self.fb_y0, y)  
@@ -114,46 +195,47 @@ class Display:
         """
         fb = self.fb
         a = (x + y0 * self.WIDTH) * self.BYTES_PER_PIXEL
-        for i in range(y1 - y0):
+        for i in range(y1 - y0 + 1):
             fb[a] = color >> 8
             fb[a+1] = color & 0xFF
             a += self.BYTES_PER_LINE
         self.fb_y0 = min(self.fb_y0, y0)  
         self.fb_y1 = max(self.fb_y1, y1) 
 
-    def draw_row_wise_mono_bitmap(self, x: int, y: int, data: list, width=8, height=8, fg=WHITE,  bg=BLACK) -> None:
-        """ Writes a 8x8 monochrome bitmap in the frame buffer.
+    # def draw_row_wise_mono_bitmap(self, x: int, y: int, data: list, width=8, height=8, fg=WHITE,  bg=BLACK) -> None:
+    #     """ Writes a 8x8 monochrome bitmap in the frame buffer.
 
-        The routine is optimized to be efficient in micropython. 
-        As currently written, it works only for BYTES_PER_PIXEL=2, with R=5 bits, G=6 bits and  B=5 bits.
+    #     The routine is optimized to be efficient in micropython. 
+    #     As currently written, it works only for BYTES_PER_PIXEL=2, with R=5 bits, G=6 bits and  B=5 bits.
 
-        Parameters:
+    #     Parameters:
 
-            x, y (int): coordinate of the upper-left corner of the bitmap
+    #         x, y (int): coordinate of the upper-left corner of the bitmap
 
-            r, g, b (int): foreground color (0-255)
+    #         r, g, b (int): foreground color (0-255)
 
-            bg_r, bg_g, bg_b: background color (0-255)
-        """
-        # t0 = time.ticks_ms()
-        fb = self.fb
-        addr = (x + y * self.WIDTH) * self.BYTES_PER_PIXEL
-        # ta = time.ticks_cpu()
-        for j in range(height): # scan rows
-            d = data[j]
-            a = addr
-            for i in range(width): # scan columns
-                if (d & (0x80 >> i)):
-                    fb[a] = fg >> 8; a +=1
-                    fb[a] = fg & 0xFF; a +=1
-                else:
-                    fb[a] = bg >> 8; a +=1
-                    fb[a] = bg & 0xFF; a +=1
-            addr += self.BYTES_PER_LINE
+    #         bg_r, bg_g, bg_b: background color (0-255)
+    #     """
+    #     # t0 = time.ticks_ms()
+    #     fb = self.fb
+    #     addr = (x + y * self.WIDTH) * self.BYTES_PER_PIXEL
+    #     # ta = time.ticks_cpu()
+    #     for j in range(height): # scan rows
+    #         d = data[j]
+    #         a = addr
+    #         for i in range(width): # scan columns
+    #             if (d & (0x80 >> i)):
+    #                 fb[a] = fg >> 8; a +=1
+    #                 fb[a] = fg & 0xFF; a +=1
+    #             else:
+    #                 fb[a] = bg >> 8; a +=1
+    #                 fb[a] = bg & 0xFF; a +=1
+    #         addr += self.BYTES_PER_LINE
 
-        # expand the refresh zone to include modified lines
-        self.fb_y0 = min(self.fb_y0, y)  
-        self.fb_y1 = max(self.fb_y1, y + height -1)  
+    #     # expand the refresh zone to include modified lines
+    #     self.fb_y0 = min(self.fb_y0, y)  
+    #     self.fb_y1 = max(self.fb_y1, y + height -1)  
+
 
     def draw_col_wise_mono_bitmap(self, x: int, y: int, data: list, width=5, height=7, fg=WHITE, bg=BLACK) -> None:
         """ Writes a 5x7 monochrome bitmap in the frame buffer. Data bytes represent columns.
@@ -188,11 +270,13 @@ class Display:
         self.fb_y1 = max(self.fb_y1, y + height -1)  
 
     def set_font(self, font_size):
+        if font_size is None:
+            return
         if font_size==8:
             self.font = font.font8x8
             self.font_width = 8
             self.font_height = 8
-            self.font_is_row_wise = True
+            self.font_is_row_wise = False
         else:
             self.font = font.font5x7
             self.font_width = 5
@@ -211,7 +295,24 @@ class Display:
         else:
             self.bg = color
 
-    def print(self, text, x=None, y=None, fg=None, bg=None, update=True, font_size=None):
+    def set_colors(self, fg=None, bg=None, hl_fg=None, hl_bg=None):
+        if fg is not None:
+            self.set_fg_color(fg)
+        if bg is not None:
+            self.set_bg_color(bg)
+        if hl_fg is not None:
+            self.hl_fg = self.encode_color(hl_fg) if isinstance(hl_fg, tuple) else hl_fg;
+        if hl_bg is not None:
+            self.hl_bg = self.encode_color(hl_bg) if isinstance(hl_bg, tuple) else hl_bg;
+
+    def print_width(self, text):
+        """ Return the maximum length of the text lines in ``text``, excluding non-printable characters 
+        """
+        return max(sum(not(c == '\r' or c == '\n' or c==CC or ord(c)>=128) 
+                   for c in line) 
+                   for line in text.splitlines()) 
+
+    def print(self, text, x=None, y=None, width = None, fg=None, bg=None, font_size=None, hl_start=None, hl_stop=None, inv_start=None, inv_stop=None, wrap=False, update=False ):
         """ Print text in the frame buffer
 
         Parameters:
@@ -226,53 +327,94 @@ class Display:
 
             font_size (int): Indicates which font to use by calling ``set_font()``. If not specified, the current font is used. 
 
+            inv_start, inv_stop (int): position between which the text colors are inverted
         """
-        if font_size:
-            self.set_font(font_size)
         if x is not None:
             self.text_x = x
         if y is not None:
             self.text_y = y
-        if fg is not None:
-            self.set_fg_color(fg)
-        if bg is not None:
-            self.set_bg_color(bg)
+        self.set_font(font_size)
+        self.set_colors(fg=fg, bg=bg)
+
         font = self.font
         font_width = self.font_width
         font_height = self.font_height
-        font_is_row_wise = self.font_is_row_wise 
+        fg = self.fg
+        bg = self.bg
+        # font_is_row_wise = self.font_is_row_wise 
 
         # print(f'Printing {text} at {self.text_x=}, {self.text_y=}')
-        for c in text:
-            if c == '\r':
-                self.text_x = 0
-                continue
-            elif c == '\n':
-                self.text_y += font_height
-                continue
-            if self.text_x + font_width > self.WIDTH:
-                self.text_x = 0
-                self.text_y += font_height
- 
-            if font_is_row_wise: # implied 8x8 font with row-wise encoding
-                cc = ord(c) * self.font_height # x8
-                bitmap = font[cc: cc + font_height]
-                self.draw_row_wise_mono_bitmap(self.text_x, self.text_y, bitmap, width=font_width, height=font_height, fg=self.fg, bg=self.bg)
-            else: # implied 5x7 font with column-wise encoding
-                cc = ord(c) * self.font_width
-                bitmap = font[cc: cc + font_width]
-                self.draw_col_wise_mono_bitmap(self.text_x, self.text_y, bitmap, width=font_width, height=font_height, fg=self.fg, bg=self.bg)
-            self.text_x += font_width
+        highlight = False
+        invert = False
+        x1 = min(self.WIDTH-1, self.text_x + width*font_width - 1) if width is not None else self.WIDTH-1
 
-            # wrap text
-            if self.text_x >= self.WIDTH:
+        def pad():
+            if self.text_x > x1:
+                return
+            # print(f'Fill {self.text_x, self.text_y, x1, self.text_y + font_height-1}')
+            self.fill(self.text_x, self.text_y, x1, self.text_y + font_height - 1, fg if invert else bg)
+
+        def newline():
+            pad()
+            self.text_x = 0
+            self.text_y += font_height
+
+        for pos, c in enumerate(text):
+            # cc = ord(c)
+            # Process special characters
+            if c == '\r': # carriage return
+                pad()
                 self.text_x = 0
-                self.text_y += font_height
+                continue
+            elif c == '\n': # newline (carriage return + linefeed)
+                newline()
+                continue
+            elif c == CC: # clear color codes
+                fg = self.fg
+                bg = self.bg 
+                continue
+            elif (cc := ord(c)) >= 192: # background color codes
+                bg = self.convert_R2G2B2_color(cc)   
+                continue
+            elif cc >= 128: # foreground color codes
+                fg = self.convert_R2G2B2_color(cc)
+                continue
+            # wrap line if current character won't fit   
+            if self.text_x + font_width - 1 > x1:
+                if wrap:
+                    newline()
+                else:
+                    continue # don't print character. Will have room after next newline.
+            # print(f'print {c!r} ({ord(c)}) at {self.text_x, self.text_y}')
+            cc = ord(c) * self.font_width
+            bitmap = font[cc: cc + font_width]
+            if pos == hl_start:
+                highlight = True
+            if pos == inv_start:
+                invert = True
+            fg_ = self.hl_fg if highlight else fg
+            bg_ = self.hl_bg if highlight else bg
+            self.draw_col_wise_mono_bitmap(
+                self.text_x, self.text_y, bitmap, 
+                width=font_width, height=font_height, 
+                fg=bg_ if invert else fg_, 
+                bg=fg_ if invert else bg_)
+            self.text_x += font_width
+            if pos == hl_stop:
+                highlight = False
+            if pos == inv_stop:
+                invert = False
+            # # wrap text
+            # if wrap and self.text_x > x1:
+            #     if wrap:
+            #         self.text_x = 0
+            #         self.text_y += font_height
+        pad()
 
         # print(f' {self.fb_y0=}, {self.fb_y1=}')
  
         if update:
-            self.write_frame_buffer()
+            self.update()
 
     def test_text(self,r=255, g=255, b=255):
         self.clear_frame_buffer()
