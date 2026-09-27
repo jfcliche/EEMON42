@@ -8,3 +8,6 @@ old/
 *.log
 *.kicad_sch-bak
 production/
+.history
+.kicad_prl
+fp-info-cache

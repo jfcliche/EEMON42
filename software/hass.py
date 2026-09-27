@@ -37,12 +37,8 @@ class HomeAssistant:
         self.network_ready = network_ready
         self.verbose = verbose
 
-        self._host = (
-            config.get('hass_host')
-            or config.get('hass_ip')
-            or config.get('mqtt_server')
-        )
-        self._port = int(config.get('hass_port', 8123))
+        self._host = secrets.get('hass_host')
+        self._port = int(secrets.get('hass_port', 8123))
         self._token = secrets.get('hass_api_token', '')
 
         self._reader = None
