@@ -3,6 +3,8 @@ import time
 # import pyftdi.spi
 from machine import Pin
 
+from namespace import Namespace
+
 def BIT(x):
     return 1 << x
 
@@ -12,78 +14,79 @@ class ADE7816:
     STATUS0_LENERGY = BIT(5)
 
     REGS = {
+         # Datasheet Names are modified to normaliz them: Channel registers are always prefixed with the channel letter
         'VGAIN' : (0x4380, '32ZPSE'),  #0x000000 Voltage gain adjustment.
-        'IAGAIN' : (0x4381, '32ZPSE'),  #0x000000 Current Channel A current gain adjustment.
-        'IBGAIN' : (0x4382, '32ZPSE'),  #0x000000 Current Channel B current gain adjustment.
-        'ICGAIN' : (0x4383, '32ZPSE'),  #0x000000 Current Channel C current gain adjustment.
-        'IDGAIN' : (0x4384, '32ZPSE'),  #0x000000 Current Channel D current gain adjustment.
-        'IEGAIN' : (0x4385, '32ZPSE'),  #0x000000 Current Channel E current gain adjustment.
-        'IFGAIN' : (0x4386, '32ZPSE'),  #0x000000 Current Channel F current gain adjustment.
+        'IGAIN0' : (0x4381, '32ZPSE'),  #0x000000 Current Channel A current gain adjustment. 
+        'IGAIN1' : (0x4382, '32ZPSE'),  #0x000000 Current Channel B current gain adjustment.
+        'IGAIN2' : (0x4383, '32ZPSE'),  #0x000000 Current Channel C current gain adjustment.
+        'IGAIN3' : (0x4384, '32ZPSE'),  #0x000000 Current Channel D current gain adjustment.
+        'IGAIN4' : (0x4385, '32ZPSE'),  #0x000000 Current Channel E current gain adjustment.
+        'IGAIN5' : (0x4386, '32ZPSE'),  #0x000000 Current Channel F current gain adjustment.
         'DICOEFF' : (0x4388, '32ZPSE'),  #0x000000 Register used in the digital integrator algorithm.
         'HPFDIS' : (0x4389, '32ZPSE'),  #0x000000 Disables the high-pass filter for all channels.
         'VRMSOS' : (0x438A, '32ZPSE'),  #0x000000 Voltage rms offset.
-        'IARMSOS' : (0x438B, '32ZPSE'),  #0x000000 Current Channel A current rms offset.
-        'IBRMSOS' : (0x438C, '32ZPSE'),  #0x000000 Current Channel B current rms offset.
-        'ICRMSOS' : (0x438D, '32ZPSE'),  #0x000000 Current Channel C current rms offset.
-        'IDRMSOS' : (0x438E, '32ZPSE'),  #0x000000 Current Channel D current rms offset.
-        'IERMSOS' : (0x438F, '32ZPSE'),  #0x000000 Current Channel E current rms offset.
-        'IFRMSOS' : (0x4390, '32ZPSE'),  #0x000000 Current Channel F current rms offset.
-        'AWGAIN' : (0x4391, '32ZPSE'),  #0x000000 Channel A active power gain adjust.
-        'AWATTOS' : (0x4392, '32ZPSE'),  #0x000000 Channel A active power offset adjust.
-        'BWGAIN' : (0x4393, '32ZPSE'),  #0x000000 Channel B active power gain adjust.
-        'BWATTOS' : (0x4394, '32ZPSE'),  #0x000000 Channel B active power offset adjust.
-        'CWGAIN' : (0x4395, '32ZPSE'),  #0x000000 Channel C active power gain adjust.
-        'CWATTOS' : (0x4396, '32ZPSE'),  #0x000000 Channel C active power offset adjust.
-        'DWGAIN' : (0x4397, '32ZPSE'),  #0x000000 Channel D active power gain adjust
-        'DWATTOS' : (0x4398, '32ZPSE'),  #0x000000 Channel D active power offset adjust.
-        'EWGAIN' : (0x4399, '32ZPSE'),  #0x000000 Channel E active power gain adjust.
-        'EWATTOS' : (0x439A, '32ZPSE'),  #0x000000 Channel E active power offset adjust.
-        'FWGAIN' : (0x439B, '32ZPSE'),  #0x000000 Channel F active power gain adjust.
-        'FWATTOS' : (0x439C, '32ZPSE'),  #0x000000 Channel F active power offset adjust.
-        'AVARGAIN' : (0x439D, '32ZPSE'),  #0x000000 Channel A reactive power gain adjust.
-        'AVAROS' : (0x439E, '32ZPSE'),  #0x000000 Channel A reactive power offset adjust.
-        'BVARGAIN' : (0x439F, '32ZPSE'),  #0x000000 Channel B reactive power gain adjust.
-        'BVAROS' : (0x43A0, '32ZPSE'),  #0x000000 Channel B reactive power offset adjust.
-        'CVARGAIN' : (0x43A1, '32ZPSE'),  #0x000000 Channel C reactive power gain adjust.
-        'CVAROS' : (0x43A2, '32ZPSE'),  #0x000000 Channel C reactive power offset adjust.
-        'DVARGAIN' : (0x43A3, '32ZPSE'),  #0x000000 Channel D reactive power gain adjust.
-        'DVAROS' : (0x43A4, '32ZPSE'),  #0x000000 Channel D reactive power offset adjust.
-        'EVARGAIN' : (0x43A5, '32ZPSE'),  #0x000000 Channel E reactive power gain adjust.
-        'EVAROS' : (0x43A6, '32ZPSE'),  #0x000000 Channel E reactive power offset adjust.
-        'FVARGAIN' : (0x43A7, '32ZPSE'),  #0x000000 Channel F reactive power gain adjust.
-        'FVAROS' : (0x43A8, '32ZPSE'),  #0x000000 Channel F reactive power offset adjust.
+        'IRMSOS0' : (0x438B, '32ZPSE'),  #0x000000 Current Channel A current rms offset.
+        'IRMSOS1' : (0x438C, '32ZPSE'),  #0x000000 Current Channel B current rms offset.
+        'IRMSOS2' : (0x438D, '32ZPSE'),  #0x000000 Current Channel C current rms offset.
+        'IRMSOS3' : (0x438E, '32ZPSE'),  #0x000000 Current Channel D current rms offset.
+        'IRMSOS4' : (0x438F, '32ZPSE'),  #0x000000 Current Channel E current rms offset.
+        'IRMSOS5' : (0x4390, '32ZPSE'),  #0x000000 Current Channel F current rms offset.
+        'WGAIN0' : (0x4391, '32ZPSE'),  #0x000000 Channel A active power gain adjust.
+        'WATTOS0' : (0x4392, '32ZPSE'),  #0x000000 Channel A active power offset adjust.
+        'WGAIN1' : (0x4393, '32ZPSE'),  #0x000000 Channel B active power gain adjust.
+        'WATTOS1' : (0x4394, '32ZPSE'),  #0x000000 Channel B active power offset adjust.
+        'WGAIN2' : (0x4395, '32ZPSE'),  #0x000000 Channel C active power gain adjust.
+        'WATTOS2' : (0x4396, '32ZPSE'),  #0x000000 Channel C active power offset adjust.
+        'WGAIN3' : (0x4397, '32ZPSE'),  #0x000000 Channel D active power gain adjust
+        'WATTOS3' : (0x4398, '32ZPSE'),  #0x000000 Channel D active power offset adjust.
+        'WGAIN4' : (0x4399, '32ZPSE'),  #0x000000 Channel E active power gain adjust.
+        'WATTOS4' : (0x439A, '32ZPSE'),  #0x000000 Channel E active power offset adjust.
+        'WGAIN5' : (0x439B, '32ZPSE'),  #0x000000 Channel F active power gain adjust.
+        'WATTOS5' : (0x439C, '32ZPSE'),  #0x000000 Channel F active power offset adjust.
+        'VARGAIN0' : (0x439D, '32ZPSE'),  #0x000000 Channel A reactive power gain adjust.
+        'VAROS0' : (0x439E, '32ZPSE'),  #0x000000 Channel A reactive power offset adjust.
+        'VARGAIN1' : (0x439F, '32ZPSE'),  #0x000000 Channel B reactive power gain adjust.
+        'VAROS1' : (0x43A0, '32ZPSE'),  #0x000000 Channel B reactive power offset adjust.
+        'VARGAIN2' : (0x43A1, '32ZPSE'),  #0x000000 Channel C reactive power gain adjust.
+        'VAROS2' : (0x43A2, '32ZPSE'),  #0x000000 Channel C reactive power offset adjust.
+        'VARGAIN3' : (0x43A3, '32ZPSE'),  #0x000000 Channel D reactive power gain adjust.
+        'VAROS3' : (0x43A4, '32ZPSE'),  #0x000000 Channel D reactive power offset adjust.
+        'VARGAIN4' : (0x43A5, '32ZPSE'),  #0x000000 Channel E reactive power gain adjust.
+        'VAROS4' : (0x43A6, '32ZPSE'),  #0x000000 Channel E reactive power offset adjust.
+        'VARGAIN5' : (0x43A7, '32ZPSE'),  #0x000000 Channel F reactive power gain adjust.
+        'VAROS5' : (0x43A8, '32ZPSE'),  #0x000000 Channel F reactive power offset adjust.
         'WTHR1' : (0x43AB, '32ZP'),  #0x000000 Most significant 24 bits of the WTHR[47:0]
         'WTHR0' : (0x43AC, '32ZP'),  #0x000000 Least significant 24 bits of the WTHR[47:0]
         'VARTHR1' : (0x43AD, '32ZP'),  #0x000000 Most significant 24 bits of the VARTHR[47:0]
         'VARTHR0' : (0x43AE, '32ZP'),  #0x000000 Least significant 24 bits of the VARTHR[47:0]
         'APNOLOAD' : (0x43AF, '32ZP'),  #0x000000 No load threshold in the active power datapath.
         'VARNOLOAD' : (0x43B0, '32ZPSE'),  #0x000000 No load threshold in the reactive power
-        'PCF_A_COEFF' : (0x43B1, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel A.
-        'PCF_B_COEFF' : (0x43B2, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel B.
-        'PCF_C_COEFF' : (0x43B3, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel C. 
-        'PCF_D_COEFF' : (0x43B4, '32ZPSE'),  #0x000000 Phase calibration coefficientfor Channel D. 
-        'PCF_E_COEFF' : (0x43B5, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel E. 
-        'PCF_F_COEFF' : (0x43B6, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel F.
+        'PCF_COEFF0' : (0x43B1, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel A.
+        'PCF_COEFF1' : (0x43B2, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel B.
+        'PCF_COEFF2' : (0x43B3, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel C. 
+        'PCF_COEFF3' : (0x43B4, '32ZPSE'),  #0x000000 Phase calibration coefficientfor Channel D. 
+        'PCF_COEFF4' : (0x43B5, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel E. 
+        'PCF_COEFF5' : (0x43B6, '32ZPSE'),  #0x000000 Phase calibration coefficient for Channel F.
         'VRMS' : (0x43C0, '32ZP'),  #N/A Voltage rms value.
-        'IARMS' : (0x43C1, '32ZP'),  #N/A Current Channel A current rms value.
-        'IBRMS' : (0x43C2, '32ZP'),  #N/A Current Channel B current rms value.
-        'ICRMS' : (0x43C3, '32ZP'),  #N/A Current Channel C current rms value.
-        'IDRMS' : (0x43C4, '32ZP'),  #N/A Current Channel D current rms value.
-        'IERMS' : (0x43C5, '32ZP'),  #N/A Current Channel E current rms value.
-        'IFRMS' : (0x43C6, '32ZP'),  #N/A Current Channel F current rms value.
+        'IRMS0' : (0x43C1, '32ZP'),  #N/A Current Channel A current rms value.
+        'IRMS1' : (0x43C2, '32ZP'),  #N/A Current Channel B current rms value.
+        'IRMS2' : (0x43C3, '32ZP'),  #N/A Current Channel C current rms value.
+        'IRMS3' : (0x43C4, '32ZP'),  #N/A Current Channel D current rms value.
+        'IRMS4' : (0x43C5, '32ZP'),  #N/A Current Channel E current rms value.
+        'IRMS5' : (0x43C6, '32ZP'),  #N/A Current Channel F current rms value.
         'RUN' : (0xE228, '16U'),  #This register starts and stops the DSP. 16-bit, R/W, unsigned
-        'AWATTHR' : (0xE400, '32S'),  #Channel A active energy accumulation.
-        'BWATTHR' : (0xE401, '32S'),  #Channel B active energy accumulation.
-        'CWATTHR' : (0xE402, '32S'),  #Channel C active energy accumulation.
-        'DWATTHR' : (0xE403, '32S'),  #Channel D active energy accumulation.
-        'EWATTHR' : (0xE404, '32S'),  #Channel E active energy accumulation.
-        'FWATTHR' : (0xE405, '32S'),  #Channel F active energy accumulation.
-        'AVARHR' : (0xE406, '32S'),  #Channel A reactive energy accumulation.
-        'BVARHR' : (0xE407, '32S'),  #Channel B reactive energy accumulation.
-        'CVARHR' : (0xE408, '32S'),  #Channel C reactive energy accumulation.
-        'DVARHR' : (0xE409, '32S'),  #Channel D reactive energy accumulation.
-        'EVARHR' : (0xE40A, '32S'),  #Channel E reactive energy accumulation.
-        'FVARHR' : (0xE40B, '32S'),  #Channel F reactive energy accumulation.
+        'WATTHR0' : (0xE400, '32S'),  #Channel A active energy accumulation.
+        'WATTHR1' : (0xE401, '32S'),  #Channel B active energy accumulation.
+        'WATTHR2' : (0xE402, '32S'),  #Channel C active energy accumulation.
+        'WATTHR3' : (0xE403, '32S'),  #Channel D active energy accumulation.
+        'WATTHR4' : (0xE404, '32S'),  #Channel E active energy accumulation.
+        'WATTHR5' : (0xE405, '32S'),  #Channel F active energy accumulation.
+        'VARHR0' : (0xE406, '32S'),  #Channel A reactive energy accumulation.
+        'VARHR1' : (0xE407, '32S'),  #Channel B reactive energy accumulation.
+        'VARHR2' : (0xE408, '32S'),  #Channel C reactive energy accumulation.
+        'VARHR3' : (0xE409, '32S'),  #Channel D reactive energy accumulation.
+        'VARHR4' : (0xE40A, '32S'),  #Channel E reactive energy accumulation.
+        'VARHR5' : (0xE40B, '32S'),  #Channel F reactive energy accumulation.
         'IPEAK' : (0xE500, '32U'),  #Current peak register.
         'VPEAK' : (0xE501, '32U'),  #Voltage peak register.
         'STATUS0' : (0xE502, '32U'),  #Interrupt Status Register 0.
@@ -93,9 +96,9 @@ class ADE7816:
         'SAGLVL' : (0xE509, '32ZP'),  #0x000000 Voltage sag level threshold.
         'MASK0' : (0xE50A, '32U'),  #Interrupt Enable Register 0.
         'MASK1' : (0xE50B, '32U'),  #Interrupt Enable Register 1.
-        'IAWV_IDWV' : (0xE50C, '32SE'),  #N/A Instantaneous Current Channel A and
-        'IBWV_IEWV' : (0xE50D, '32SE'),  #N/A Instantaneous Current Channel B and
-        'ICWV_IFWV' : (0xE50E, '32SE'),  #N/A Instantaneous Current Channel C and
+        'IWV03' : (0xE50C, '32SE'),  # IAWV_IDWV: N/A Instantaneous Current Channel A and
+        'IWV14' : (0xE50D, '32SE'),  # IBWV_IEWV:Instantaneous Current Channel B and
+        'IWV25' : (0xE50E, '32SE'),  # ICWV_IFWV: N/A Instantaneous Current Channel C and
         'VWV' : (0xE510, '32SE'),  #N/A Instantaneous voltage.
         'CHECKSUM' : (0xE51F, '32U'),  #Checksum verification (see the Checksum
         'CHSTATUS' : (0xE600, '16U'),  #Channel peak register.
@@ -133,10 +136,10 @@ class ADE7816:
         '8U': (1, 8, False),  # unsigned 8-bit value
         '8S': (1, 8, True),  # signed 8-bit value
         }
+    N_CHANNELS = 6
+    CHANNELS = '012345'
 
-    CHANNELS = 'ABCDEF'
-
-    def __init__(self, spi, cs_pin, irq_pin, irq_wrapper, index):
+    def __init__(self, spi, cs_pin, irq_pin, irq_wrapper, index, config=None):
         """ Create the energy monitor object, but don't initialize the hardware yet.
 
         Parameters:
@@ -146,6 +149,19 @@ class ADE7816:
             cs_pin (machine.Pin): Pin that controls the display chip select line. Mode must be set by the user.
 
             index (int): energy monitor number
+
+        Configuration parameters
+
+                _chip (int): chip number. Not used internally, but makes the JSON file more human editable.
+
+                v_gain (float): ratio between the RMS voltage at the barrel connector and the RMS voltage at the chip. This is fixed by the resistor divider on the board, and the value is typically 499/(499+21500). Each resistor has a 1% accuracy. 
+
+                vt_cal (float): voltage transformer calibration: ratio between the RMS line voltage and the RMS voltage at 
+                    the barrel connector. If using the trnasformer spec, we typically use no-load output voltage value 
+                    since the board offers a very small load. A 9V transformer typicallyprovides a no-lod 10.8 Vrms for a 
+                    120Vrms line voltage, so vt_cal= 10.8/120 = 0.09. 
+
+
         """
 
         self.spi = spi
@@ -155,23 +171,37 @@ class ADE7816:
         self.cmd = bytearray(3+4)  # command & data bytes
         self.rx_buf = bytearray(4) # reply word
         self.index = index
+        self.config = config
+
+        self.verbose = 0
+
         self.line_frequency = 60 # in Hz
         self.integ_cycles = self.line_frequency * 5 # amount of integration, in line cycles
-        self.ct_cal = 0.312/20 # Vrms/Irms # SCT-013 = 1Vrms/20Irms,100 ohm burden, including divider network and its input impedance, Vout=0.436Vp/20Arms, 
         # irq_handler = irq_wrapper(self.irq_handler) if irq_wrapper else self.irq_handler;
         # self.irq_pin.irq(trigger=Pin.IRQ_FALLING, handler=self.irq_handler) 
-        self.v_gain = 499/(499+21500)
-        self.vt_cal = 10.8/120 # output volts / input volts (use no-load output voltage value since we are far from full load)
         self.t0 = time.time_ns()
-        self.total_energy = 0
-        self.energy_cal = 0.519 #1.22155 # J/lsb
         self.energy_count = 0
+ 
+        N = self.N_CHANNELS
+
+        self.voltage = 240
+        self.current = [0.0] * N
+        self.active_energy = [0.0] * N 
+        self.reactive_energy = [0.0] * N 
+        self.total_active_energy = [0.0] * N
+        self.active_power = [0.0] * N 
+        self.reactive_power = [0.0] * N 
+        self.apparent_power = [0.0] * N 
+        self.power_factor = [0.0] * N 
+        self.update_number = 0
 
 
     def init(self):
         """ Initialize the energy monitor chip
         """
         print(f'Initializing ADE7816 Energy monitor {self.index}')
+
+        N = self.N_CHANNELS
 
 
         # make sure we are in SPI mode by issuing 3 dummy writes as recommended by datasheet. 
@@ -189,6 +219,32 @@ class ADE7816:
                 if v != vv:
                     # print(f'EMON{self.index}: SPI Communication error. Wrote {v:08X}, read {vv:08x}.')
                     raise RuntimeError(f'EMON{self.index}: SPI Communication error. Wrote {v:08X}, read {vv:08x}.')
+
+
+        conf = self.config
+
+        # Make sure the config has a dict for each channel
+        conf.setdefault('channels',[Namespace()] * N) # ensure there is a config for each channel
+
+        # Set common registers from config; add config values with default if they do not exist 
+        conf.setdefault('v_gain',499/(499+21500))
+        conf.setdefault('vt_cal', 10.8/120) # output volts / input volts (use no-load output voltage value since we are far from full load)
+
+        for reg, default in (('VGAIN', 0), ('VRMSOS', 0), ('APNOLOAD', 0), ('VARNOLOAD', 0)):
+            self.write_reg(reg, conf.setdefault(reg, default))
+
+        PCF_CAL_VALUE = 0x401235 # 0x401235 for 60 Hz, 0x 400ca4 for 50 Hz
+
+        # Set channel-specific registers from config; add config values with default if they do not exist 
+        for ch in range(N):
+            chconf = conf.channels[ch]
+            chconf.setdefault('ct_cal', 0.312/20) # Vrms/Irms # SCT-013 = 1Vrms/20Irms,100 ohm burden, including divider network and its input impedance, Vout=0.436Vp/20Arms, 
+            chconf.setdefault('energy_cal', 0.519) #1.22155 # J/lsb
+            for reg, default in (
+                    ('IGAIN',0), ('IRMSOS',0), ('WATTOS',0), ('WGAIN',0), 
+                    ('VAROS',0), ('VARGAIN',0), ('PCF_COEFF', PCF_CAL_VALUE)):
+                self.write_reg(reg, chconf.setdefault(reg, default), ch)
+        
         # set active energy integration threshold
         # A value should be 0x000002_000000 for standard operation. The update rate of the WATTHR rehister is then just below the max of 8 kHz for full scale.  
         self.write_reg('WTHR1', 0x000002)
@@ -196,7 +252,7 @@ class ADE7816:
         # set reactive energy integration threshold
         self.write_reg('VARTHR1', 0x000000)
         self.write_reg('VARTHR0', 0x400000)
-        self.write_reg('LINECYC', self.integ_cycles * 2) # integration perion in half cycles
+        self.write_reg('LINECYC', self.integ_cycles * 2) # integration period in half cycles
         self.write_reg('LCYCMODE', 0b00001011) # Enable zero crossing detector and line accumulation mode
 
         self.write_reg('MASK0', self.STATUS0_LENERGY) 
@@ -208,13 +264,14 @@ class ADE7816:
         status1 = self.read_reg('STATUS1')        
         self.write_reg('STATUS1', status1) 
 
-        PCF_CAL_VALUE = 0x401235 # 0x401235 for 60 Hz, 0x 400ca4 for 50 Hz
-        for ch in self.CHANNELS:
-            self.write_reg(f'PCF_{ch}_COEFF', PCF_CAL_VALUE)  
+        # for ch in range(self.N_CHANNELS):
+        #     self.write_reg('PCF_COEFF', PCF_CAL_VALUE, ch)  
 
         # repeat last write to ensure the value propagates through the pipeline, as requested in the datasheet
-        for i in range(2):
-            self.write_reg(f'PCF_{self.CHANNELS[-1]}_COEFF', PCF_CAL_VALUE)
+        # for i in range(2):
+        #     self.write_reg(f'PCF_{self.CHANNELS[-1]}_COEFF', PCF_CAL_VALUE)
+        for _ in range(3):
+            self.write_reg('DUMMY',0)
 
         self.start_dsp()
         self.start_dsp()
@@ -227,25 +284,31 @@ class ADE7816:
         lenergy_irq = bool(status0 & self.STATUS0_LENERGY)
         dt = (time.time_ns() - self.t0) / 1e9
         if lenergy_irq:
-            energy = self.read_reg('AWATTHR') * self.energy_cal
-            reactive_energy = self.read_reg('AVARHR') * self.energy_cal
-            angle = self.read_reg('ANGLE0')*360*60/256000
-            current = self.get_current(0)
-            voltage = self.get_voltage()
-            self.total_energy += energy 
+            self.voltage = self.get_voltage()
             self.energy_count += 1
             dt = int(self.integ_cycles * 2) / 2 / self.line_frequency       
-            apparent_energy = current * voltage * dt
-            power_factor = energy / apparent_energy
-            print(f'{dt:.3f} EMON{self.index}: #{self.energy_count}, volt = {voltage:.3f} V, curr={current:.3f} A, '
-                  +f'app = {apparent_energy/dt} VA, act: {energy/dt:.3f} W, react: {reactive_energy/dt:.3f} VAr, angle={angle}, PF={power_factor:.2}, tot act= {self.total_energy/3600} Wh')
-            # print(f'{dt:.3f} IRQ={pin()} LENERGY={lenergy_irq} EMON{self.index}: status0={status0:024b}, status1={status1:016b}, AWATTHR={energy} W, tot = {self.total_energy/3600} kWh')
+            for ch in range(self.N_CHANNELS):
+                energy_cal = self.config.channels[ch].energy_cal
+                self.active_energy[ch] = self.read_reg('WATTHR', ch) * energy_cal
+                self.reactive_energy[ch] = self.read_reg('VARHR', ch) * energy_cal
+                self.total_active_energy[ch] += self.active_energy[ch] 
+                # angle = self.read_reg('ANGLE0')*360*60/256000
+                self.current[ch] = self.get_current(ch)
+                self.active_power[ch] = self.active_energy[ch] / dt
+                self.apparent_power[ch] = self.current[ch] * self.voltage
+                self.power_factor[ch] = self.active_power[ch] / self.apparent_power[ch]
+                # print(f'{self.total_active_energy}')
+                print(f'{dt:.3f} EMON{self.index}.{ch}: #{self.energy_count}, volt = {self.voltage:.3f} V, curr={self.current[ch]:.3f} A, '
+                      f'app = {self.apparent_power[ch]} VA, act: {self.active_power[ch]:.3f} W, '
+                      f'react: {self.reactive_power[ch]:.3f} VAr, PF={self.power_factor[ch]:.2}, '
+                      f'tot act= {self.total_active_energy[ch]/3600:0.0f} Wh')
+                # print(f'{dt:.3f} IRQ={pin()} LENERGY={lenergy_irq} EMON{self.index}: status0={status0:024b}, status1={status1:016b}, AWATTHR={energy} W, tot = {self.total_active_energy/3600} kWh')
             self.write_reg('STATUS0', self.STATUS0_LENERGY)
         else:
             print(f'{dt:.3f} EMON{self.index}: LENERGY flag not set, ignoring')
 
 
-    def read_reg(self, name):
+    def read_reg(self, name, ch=None):
         """Reads a register
 
         Parameters:
@@ -256,8 +319,10 @@ class ADE7816:
 
             int: value that was read. Will be a signed or unsigned value depending on the register number format. 
         """
-
-        (addr, fmt) = self.REGS[name]
+        if ch is None:
+            (addr, fmt) = self.REGS[name]
+        else:
+            (addr, fmt) = self.REGS[name + '0123456'[ch]]
         (byte_length, bit_length, signed) = self.FORMATS[fmt]
         cmd = self.cmd
         rx_buf = self.rx_buf
@@ -270,7 +335,7 @@ class ADE7816:
             value -= (1 << bit_length)
         return value
 
-    def write_reg(self, name, value):
+    def write_reg(self, name, value, ch=None):
         """Writes a register
 
         Parameters:
@@ -279,9 +344,14 @@ class ADE7816:
 
             value (int): value to write
 
+            ch (int): Optional channel number. Is appended to the register name if not None. 
+
         """
 
-        (addr, fmt) = self.REGS[name]
+        if ch is None:
+            (addr, fmt) = self.REGS[name]
+        else:
+            (addr, fmt) = self.REGS[name + '0123456'[ch]]
         (byte_length, bit_length, signed) = self.FORMATS[fmt]
         # print(f"writing {bytes((0, (addr>>8) & 0xFF, addr & 0xFF)) + value.to_bytes(length, 'big')}")
         cmd = self.cmd
@@ -314,16 +384,15 @@ class ADE7816:
 
             ch (int): channel number (0-5)
         """
-        c = self.CHANNELS[ch]
         # a value of 4191910 (0x3FF6A6) corresponds to a full scale analog voltage of 0.5Vp or 0.5*.707= 0.3535 Vrms. 
-        return self.read_reg(f'I{c}RMS')/4191910*0.5*0.707 / self.ct_cal
+        return self.read_reg('IRMS', ch) / 4191910 * 0.5 * 0.707 / self.config.channels[ch].ct_cal
 
     def get_voltage(self):
         """ Get instantaneous RMS voltage measurement 
 
         """
         # a value of 4191910 (0x3FF6A6) corresponds to a full scale analog voltage of 0.5Vp or 0.5*.707= 0.3535 Vrms. 
-        return self.read_reg(f'VRMS')/4191910*0.5*0.707 / self.v_gain / self.vt_cal
+        return self.read_reg('VRMS') / 4191910 * 0.5 * 0.707 / self.config.v_gain / self.config.vt_cal
 
 def test(N=0):
     from machine import Pin
