@@ -1,0 +1,442 @@
+
+# PyPi packages
+import time
+
+# Local packages
+from display import Display
+
+
+class ST7735(Display):
+    """ Object to operate SST7735-based LCD displays via its SPI interface
+
+    Parameters:
+
+        spi (SPI_with_CS): SPI_with_CS instance (SPI object with chip select handling)
+
+        cs_pin (machine.Pin): pin that controls the display's chip select line. The pin mode must be set by the user.
+
+        cd_pin (machine.Pin): pin that controls the display's command/data line. The pin mode must be set by the user.
+
+        res_pin (machine.Pin): pin that controls the display's reset line. The pin mode must be set by the user.
+
+    """
+
+    WIDTH = 128
+    HEIGHT = 160
+    BYTES_PER_PIXEL = 2
+
+    # Registers
+    # NOP = 0x0
+    # SWRESET = 0x01
+    # RDDID = 0x04
+    # RDDST = 0x09
+
+    # SLPIN  = 0x10
+    # SLPOUT  = 0x11
+    # PTLON  = 0x12
+    # NORON  = 0x13
+
+    # INVOFF = 0x20
+    # INVON = 0x21
+    # DISPOFF = 0x28
+    # DISPON = 0x29
+    # CASET = 0x2A
+    # RASET = 0x2B
+    # RAMWR = 0x2C
+    # RAMRD = 0x2E
+
+    # VSCRDEF = 0x33
+    # VSCSAD = 0x37
+
+    # COLMOD = 0x3A
+    # MADCTL = 0x36
+
+    # FRMCTR1 = 0xB1
+    # FRMCTR2 = 0xB2
+    # FRMCTR3 = 0xB3
+    # INVCTR = 0xB4
+    # DISSET5 = 0xB6
+
+    # PWCTR1 = 0xC0
+    # PWCTR2 = 0xC1
+    # PWCTR3 = 0xC2
+    # PWCTR4 = 0xC3
+    # PWCTR5 = 0xC4
+    # VMCTR1 = 0xC5
+
+    # RDID1 = 0xDA
+    # RDID2 = 0xDB
+    # RDID3 = 0xDC
+    # RDID4 = 0xDD
+
+    # PWCTR6 = 0xFC
+
+    # GMCTRP1 = 0xE0
+    # GMCTRN1 = 0xE1
+
+
+    # Registers
+    NOP = 0x00
+    SWRESET = 0x01
+    RDDID = 0x04
+    RDDST = 0x09
+
+    SLPIN = 0x10
+    SLPOUT = 0x11
+    PTLON = 0x12
+    NORON = 0x13
+
+    INVOFF = 0x20
+    INVON = 0x21
+    DISPOFF = 0x28
+    DISPON = 0x29
+
+    CASET = 0x2A
+    RASET = 0x2B
+    RAMWR = 0x2C
+    RAMRD = 0x2E
+
+    PTLAR = 0x30
+    MADCTL = 0x36
+    COLMOD = 0x3A
+
+    FRMCTR1 = 0xB1
+    FRMCTR2 = 0xB2
+    FRMCTR3 = 0xB3
+    INVCTR = 0xB4
+    DISSET5 = 0xB6
+
+
+    PWCTR1 = 0xC0
+    PWCTR2 = 0xC1
+    PWCTR3 = 0xC2
+    PWCTR4 = 0xC3
+    PWCTR5 = 0xC4
+    VMCTR1 = 0xC5
+
+    RDID1 = 0xDA
+    RDID2 = 0xDB
+    RDID3 = 0xDC
+    RDID4 = 0xDD
+
+    GMCTRP1 = 0xE0
+    GMCTRN1 = 0xE1
+
+    PWCTR6 = 0xFC
+
+    def __init__(self, spi, cs_pin, cd_pin, res_pin, fb=None):
+        import gc
+        gc.collect()
+        super().__init__(fb=fb)
+        self.spi = spi
+        self.cs_pin = cs_pin
+        self.cd_pin = cd_pin
+        self.rst_pin = res_pin
+        self.cmd = bytearray((0x15, 0, 95, 0x75, 0, 63)) # command bytes. The last two bytes are updated as needed
+        
+
+    def init(self):
+        """ Initializes the display controller to the desired display mode
+        """
+        self.reset()
+        # self.write_command((
+        #     0xAE,        # Display off
+        #     # Seg remap = 0b01110010 A[7:6]=01:64k color, A[5]=1 COM splip odd-even, A[4]=1 Scan com, A[3]=0, A[2]=0, A[1]=1, A[0]=0
+        #     0xA0, 0b01100000,
+        #     0xA1, 0x00,  # Set Display start line
+        #     0xA2, 0x00,  # Set display offset
+        #     0xA4,        # Normal display
+        #     0xA8, 0x3F,  # Set multiplex
+        #     0xAD, 0x8E,  # Master configure
+        #     0xB0, 0x0B,  # Power save mode
+        #     0xB1, 0x74,  # Phase12 period
+        #     0xB3, 0xD0,  # Clock divider
+        #     0x8A, 0x80,  # Set precharge speed A
+        #     0x8B, 0x80,  # Set precharge speed B
+        #     0x8C, 0x80,  # Set precharge speed C
+        #     0xBB, 0x3E,  # Set pre-charge voltage
+        #     0xBE, 0x3E,  # Set voltage
+        #     0x87, 15))  # Master current control 1 = dim= 35mA, 15=bright=113mA
+        # self.write_command((0xAF,))  # display ON
+
+        # self.write_command((0x26, 1))  # Enable rectangle fill
+
+        self.send_command(self.SWRESET)    # Software reset
+        time.sleep(0.150)               # delay 150 ms
+
+        self.send_command(self.SLPOUT)     # Out of sleep mode
+        time.sleep(0.500)               # delay 500 ms
+
+        # Frame rate ctrl - normal mode
+        # Rate = fosc/(1x2+40) * (LINE+2C+2D)
+        self.send_command(self.FRMCTR1, (0x01, 0x2c, 0x2d))    # (RTNA 1-line period, FPA: front porch, BPA: back porch)
+
+        # Frame rate ctrl - idle mode
+        # Rate = fosc/(1x2+40) * (LINE+2C+2D)
+        self.send_command(self.FRMCTR2, (0x01, 0x2c, 0x2d))    # Frame rate ctrl - idle mode
+
+        # Frame rate ctrl - partial mode / full color
+        # ( Dot inversion mode, _, _, Line inversion mode, _ , _)
+        self.send_command(self.FRMCTR3, (0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d) )    
+
+        # Display inversion ctrl
+        self.send_command(self.INVCTR, (0x07,)) # No inversion     
+
+        
+        self.send_command(self.PWCTR1, (  # Power control
+            0xA2,
+            0x02,                 # -4.6V
+            0x84))                 # auto mode
+
+        self.send_command(self.PWCTR2, (     # Power control
+            0x0A,                 # Opamp current small
+            0x00))                 # Boost frequency
+
+        self.send_command(self.PWCTR4,(     # Power control
+            0x8A,                 # BCLK/2, Opamp current small & Medium low
+            0x2A))
+
+        self.send_command(self.PWCTR5, (     # Power control
+            0x8A,
+            0xEE))
+
+        self.send_command(self.VMCTR1, ( # Power control 
+            0x0E,))    
+            
+
+        self.send_command(self.INVOFF)  # Don't invert display
+
+        self.send_command(self.MADCTL, (     # Memory access control (directions)
+            #0xC8,))            # row addr/col addr, bottom to top refresh; Set D3 RGB Bit to 1 for format BGR
+            0xC0,))             # row addr/col addr, bottom to top refresh; Set D3 RGB Bit to 0 for format RGB
+
+        self.send_command(self.COLMOD, (     # set color mode
+            0x05))                 # 16-bit color
+
+        self.send_command(self.CASET, (      # Column addr set
+            0x00,                 # XSTART = 0
+            0,                   # offset left
+            0x00,                 # XEND = ROWS - height
+            self.WIDTH + 0 - 1))   # offset right
+
+        self.send_command(self.RASET, (      # Row addr set
+            0x00,                 # XSTART = 0
+            0, # offset top
+            0x00,                 # XEND = COLS - width
+            self.HEIGHT + 0 -1 )) # offset bottom
+
+        self.send_command(self.GMCTRP1, (    # Set Gamma
+            0x02, 0x1c, 0x07, 0x12, 0x37, 0x32,
+            0x29, 0x2d, 0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10))         
+            
+        self.send_command(self.GMCTRN1, (    # Set Gamma
+            0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D, 0x2E,
+            0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10)) 
+
+        self.send_command(self.NORON)      # Normal display on
+        time.sleep(0.010)                # 10 ms
+
+        self.send_command(self.DISPON)
+        time.sleep(0.100)               # 100 ms
+
+        super().init()
+
+    def reset(self):
+        """ Pulses the hardware reset line of the display
+        """
+
+        self.rst_pin(0)
+        time.sleep(0.01)
+        self.rst_pin(1)
+        time.sleep(0.01)
+        # All the display needs to be refreshed
+        self.fb_y0 = 0
+        self.fb_y1 = 63
+
+    def send_command(self, cmd, data=None):
+        """ Sends 1-byte command followed by its arguments
+
+        Parameters: 
+
+            data (memoryview or list/tuple/bytes/bytearray): list of integers representing the
+                command bytes to send to the display. Can also be a byte
+                string or bytearray.
+
+        """
+        self.cd_pin(0)
+        self.spi.exchange(self.cs_pin, bytes((cmd,)))
+        if data:
+            self.cd_pin(1)
+            if isinstance(data, memoryview):
+                self.spi.exchange(self.cs_pin, data)
+            else:
+                self.spi.exchange(self.cs_pin, bytearray(data))
+
+    # def _write_command(self, data):
+    #     """ Writes data bytes
+
+    #     Parameters: 
+
+    #         data (bytes, bytearray or memoryview): bytes to send to the display.
+    #     """
+    #     self.cd_pin(0)
+    #     self.spi.exchange(self.cs_pin, data)
+
+    def write_data(self, data):
+        self.cd_pin(1)
+        self.spi.exchange(self.cs_pin, bytearray(data))
+
+    # def _write_data(self, data):
+    #     """ Assumes data is already a bytearray or buffer"""
+    #     self.cd_pin(1)
+    #     self.spi.exchange(self.cs_pin, data)
+
+
+    def display_on(self):
+        self.send_command(self.DISPON)
+
+    def display_off(self):
+        self.send_command(self.DISPOFF)
+
+    def _set_brightness(self, brightness):
+        if not brightness:
+            self.display_off()
+        else:
+            self.display_on()
+            # self.send_command((0xAF, 0x87, min(15, brightness-1))) # dislay ON, set brightness
+
+    def update(self):
+        """ Sends the specified lines of the frame buffer to the hardware display. 
+
+        If no lines are specified, only the block of lines that were modified since the last call are updated. 
+
+        Parameters:
+
+            y0, y1 (int): first and last line of the block to be updated. If None, the higest/lowest line modified since the last call is used.  
+
+        """
+        # sets the window
+        y1 = self.fb_y1
+        if y1 < 0:
+            return
+        y0 = self.fb_y0
+        with self.spi:
+            # Column & row addr set
+            self.send_command(self.CASET, (0, 0, (self.WIDTH -1) >> 8, (self.WIDTH -1) & 0xFF))
+            self.send_command(self.RASET, (y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF))
+            # self.send_command(self.RAMWR)       # write to RAM
+            # Send the frame buffer
+            self.send_command(self.RAMWR, self.fb[y0 * self.BYTES_PER_LINE: (y1+1) * self.BYTES_PER_LINE]) # fb is a memoryview, indexing does not allocate new memory
+        self.fb_y0 = self.HEIGHT - 1
+        self.fb_y1 = -1 # -1 is faster to check than y0 > y1
+
+ 
+    # def set_window(self, x1, y1, x2, y2):
+    #     self.write_command((0x15, x1, x2, 0x75, y1, y2))
+
+    # def draw_color_bitmap(self, x, y, width, height, data):
+    #     self.set_window(x, y, x + width - 1, y + height - 1)
+    #     for d in data:
+    #         r = (d >> 11) & 0b11111
+    #         g = (d >> 5) & 0b111111
+    #         b = d & 0b11111
+    #         self.write_data([r << 3 | (g & 0b111), (g & 0b111) | b << 3])
+
+    # # def draw_8x8_mono_bitmap(self, x: int, y: int, data: list, r: int = 255, g: int = 255, b: int = 255, bg_r: int = 0, bg_g: int = 0, bg_b: int = 0) -> None:
+    # #     self.set_window(x, y, x + 7, y + 7)
+    # #     index = 0
+    # #     rr = r >> 3
+    # #     gg = g >> 2
+    # #     bb = b >> 3
+    # #     bg_rr = bg_r >> 3
+    # #     bg_gg = bg_g >> 2
+    # #     bg_bb = bg_b >> 3
+    # #     cmds_fg = [rr << 3 | (gg & 0b111), (gg & 0b111) | bb << 3]
+    # #     cmds_bg = [bg_rr << 3 | (bg_gg & 0b111), (bg_gg & 0b111) | bg_bb << 3]
+    # #     for j in range(8):
+    # #         d = data[index]
+    # #         for i in range(8):
+    # #             bit = d & 0x80
+    # #             if bit != 0x00:
+    # #                 self.write_data(cmds_fg)
+    # #             else:
+    # #                 self.write_data(cmds_bg)
+    # #             d <<= 1
+    # #         index += 1
+
+
+
+    # def draw_line(self, x1, y1, x2, y2, r=255, g=255, b=255):
+    #     self.write_command((0x21, x1, y1, x2, y2, r, g, b))
+    #     time.sleep(0.001)
+
+    # def draw_rect(self, x1, y1, x2, y2, line_r=255, line_g=255, line_b=255, fill_r=0, fill_g=0, fill_b=0):
+    #     self.write_command((0x22, x1, y1, x2, y2, line_r,
+    #                        line_g, line_b, fill_r, fill_g, fill_b))
+    #     time.sleep(0.001)
+
+    # def copy(self, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y):
+    #     self.write_command(
+    #         (0x23, src_x1, src_y1, src_x2, src_y2, dest_x, dest_y))
+    #     time.sleep(0.001)
+
+    # def dim_rect(self, x1=0, y1=0, x2=95, y2=63):
+    #     """ Reduce the intensity of the pixels in the specified rectangle. Subsequent calls have no effect.
+    #     """
+    #     self.write_command((0x24, x1, y1, x2, y2))
+    #     time.sleep(0.001)
+
+    # def set_master_intensity(self, attn=15):
+    #     """ Sets the master display intensity, from 0 to 15.
+    #     """
+    #     self.write_command((0x87, attn & 0x0F))
+
+    # def set_dim(self, dim=255):
+    #     """ Sets the display dim level.
+
+    #     The dim command seems to erase the display memory, so the frame buffer has to be sent back.
+    #     This causes flicker.
+    #     We cannot completely extinguish the pixels with dim=0.
+    #     """
+    #     self.write_command((0xAB, 0, dim,dim,dim,31))
+    #     self.write_frame_buffer(0, 63, cmd=0xAC)
+    #     # self.write_command((0xAC, ))
+
+    # def clear_display(self, x1=0, y1=0, x2=WIDTH-1, y2=HEIGHT-1):
+    #     """ Clears the display's pixels in the specified rectangle coordinates.
+
+    #     This operates on the display directly, using the hardware clear command. 
+    #     The frame buffer is unaffected.
+    #     If no arguments are provided, the whole display is cleared. 
+
+    #     Parameters:
+
+    #         x1, y1, x2, y2 (int): coordinates of the rectangles to be cleared 
+    #     """
+    #     self.write_command((0x25, x1, y1, x2, y2))
+    #     time.sleep(0.001)
+    #     # All the display needs to be refreshed
+    #     self.fb_y0 = 0
+    #     self.fb_y1 = 63
+
+    # def set_fill(self, ena, rev_copy=False):
+    #     a = 0x00
+    #     if ena:
+    #         a |= 0x01
+    #     if rev_copy:
+    #         a |= 0x10
+    #     self.write_command((0x26, a))
+
+    # # Valid time intervals: 6, 10, 100 or 200 frames
+
+    # def set_scroll(self, nb_offset_cols, start_row, nb_rows, nb_offset_rows, time_interval=100):
+    #     TIME_INTERVALS = {6: 0x00, 10: 0x01, 100: 0x2, 200: 0x3}
+    #     if time_interval in TIME_INTERVALS:
+    #         self.write_command([0x27, nb_offset_cols, start_row,
+    #                            nb_rows, nb_offset_rows, TIME_INTERVALS[time_interval]])
+
+    # def stop_scroll(self):
+    #     self.write_command((0x2E,))
+
+    # def start_scroll(self):
+    #     self.write_command((0x2F,))
