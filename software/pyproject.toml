@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eemon42"
+version = "0.1.0"
+description = "MicroPython firmware for the EEMON42 ESP32-C3 home energy monitor"
+requires-python = ">=3.10"
+# On-device code targets MicroPython (machine, network, ujson, …) and ships
+# vendored helpers (e.g. umqttsimple.py). No PyPI packages are required on the MCU.
+dependencies = [
+    "pygame>=2.5",  # packeged is installed on computer only
+]
+
+
+[tool.setuptools]
+# Flat module layout for on-device deployment; not installed as a Python package on the MCU.
+packages = ["homeassistant"]
+
+[tool.setuptools.package-dir]
+"" = "."
