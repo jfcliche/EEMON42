@@ -33,8 +33,6 @@ class Button:
             self._up += 1
 
     def value(self):
-        """ Same as down()
-        """
         ret_value = self._down
         self._down = self._up = 0
         return ret_value
@@ -54,4 +52,3 @@ class Button:
 
     def clear(self):
         self._down = self._up = 0
-
