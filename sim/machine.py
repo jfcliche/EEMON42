@@ -9,13 +9,14 @@ class Pin:
 		pass
 	def value(self, val=None):
 		if val is not None:
+			print(f'pin set to {val}')
 			self._value = val
 		return self._value
 	def irq(self, handler):
 		pass
 
 	def __call__(self, *args):
-		self.value(*args)
+		return self.value(*args)
 
 class SPI:
 	def __init__(self, *args, **kwargs):

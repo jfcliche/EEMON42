@@ -9,12 +9,16 @@ class Button:
         self._arg = None
         self._up = 0
         self._down = 0
+        self.key = None
 
     def rect(self):
         return self._rect
 
     def set_rect(self, rect):
         self._rect = rect
+
+    def set_key(self, key):
+        self.key = key
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -23,6 +27,10 @@ class Button:
         elif event.type == pygame.MOUSEBUTTONUP:
             if pygame.Rect.collidepoint(self._rect, event.pos) and event.button == 1:
                 self._up += 1
+        elif event.type == pygame.KEYDOWN and event.key == self.key:
+            self._down += 1
+        elif event.type == pygame.KEYUP and event.key == self.key:
+            self._up += 1
 
     def value(self):
         """ Same as down()
@@ -32,7 +40,7 @@ class Button:
         return ret_value
 
     def is_down(self):
-        return self._rect.collidepoint(pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[0]
+        return (self._rect.collidepoint(pygame.mouse.get_pos()) and pygame.mouse.get_pressed()[0]) or (pygame.key.get_mods() & pygame.KMOD_SHIFT)
 
     def down(self):
         ret_value = self._down

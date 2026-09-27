@@ -3,35 +3,38 @@ import pygame
 
 # local packages
 import display
+import ssd1331 
 
-class SSD1331(display.Display):
+class SSD1331(ssd1331.SSD1331):
 
     WIDTH = 96
     HEIGHT = 64
     BYTES_PER_PIXEL = 2
 
     def __init__(self, *args, **kwargs):
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self.surface = pygame.surface.Surface((self.WIDTH, self.HEIGHT))
         self._sim_brightness = 0
 
     def reset(self):
         pass
 
-    def init(self):
-        super().init()
+    def write_command(self, data):
+        pass
 
-    def clear(self, x1: int = 0, y1: int = 0, x2: int = 95, y2: int = 63) -> None:
-        self.surface.fill((0, 0, 0), (x1, y1, x2, y2))
+    # def clear(self, x1: int = 0, y1: int = 0, x2: int = 95, y2: int = 63, update=False) -> None:
+    #     self.surface.fill((0, 0, 0), (x1, y1, x2, y2))
 
-    def write_frame_buffer(self, y0=0, y1=HEIGHT-1):
-        y0 = y0 if y0 is not None else self.fb_y0
-        y1 = y1 if y1 is not None else self.fb_y1
+    def update(self):
+        """ Draws the framebuffer to the surface between currently invalidated lines.
+
+        This code is not efficient, but since this runs on a PC that is much more powerful than a microcontroller, it doesn't matter.
+        """
+        y1 = self.fb_y1
         if y1 < 0: # indicates that no refresh is necessary
             return
+        y0 = self.fb_y0
         br = self._sim_brightness
-        if 1 or br<1:
-            print(f'br={br}, self.brightness={self._sim_brightness}')
         for y in range(y0, y1 + 1):
             a = y * self.BYTES_PER_LINE
             for x in range(self.WIDTH):
@@ -51,4 +54,4 @@ class SSD1331(display.Display):
             self._sim_brightness = 0
         else:
             self._sim_brightness = 0.5 + brightness/32
-        self.write_frame_buffer()
+        self.update_all()
