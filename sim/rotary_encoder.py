@@ -16,15 +16,16 @@ class RotaryEncoder:
                 self._value -= event.y
         elif event.type == pygame.KEYDOWN:
             if (event.key == pygame.K_UP and shift) or event.key == pygame.K_LEFT:
-                    self._shift_value -= 1
+                self._shift_value -= 1
             elif (event.key == pygame.K_DOWN and shift) or event.key == pygame.K_RIGHT:
-                    self._shift_value += 1
-            elif event.key == pygame.K_UP: # shift must be disabled here
+                self._shift_value += 1
+            elif event.key == pygame.K_UP:
                 self._value -= 1
             elif event.key == pygame.K_DOWN:
                 self._value += 1
 
     def value(self):
         return self._value
+
     def shift_value(self):
         return self._shift_value
