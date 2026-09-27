@@ -1,59 +1,78 @@
+import sys
+is_micropython = sys.implementation.name == 'micropython'
+
+# from ssd1331 import SSD1331 as Display  # 96x64 OLED display
+from st7735 import ST7735 as Display  # 128x160 LCD display
+
+# Allocate large frame buffer as early as possible before memory is too fragmented
+fb = memoryview(bytearray(Display.WIDTH * Display.HEIGHT * Display.BYTES_PER_PIXEL)) # frame buffer, 2 bytes per pixel
+
 # standard packages
 from machine import Pin
 import time
-from umqttsimple import MQTTClient
-import ubinascii
 import machine
-# import micropython
 import network
-# import esp
 import json
 
-import sys
-if sys.implementation.name == 'micropython':
-    import uasyncio as asyncio
-    from uasyncio import ThreadSafeFlag 
-else:
-    import asyncio
-    from asyncio import Event as ThreadSafeFlag 
+import asyncio
+import gc
+
+
+try:
+    from asyncio import ThreadSafeFlag
+except ImportError:
+    from asyncio import Event as ThreadSafeFlag
+
+from ade7816 import ADE7816  # Energy monitor chip
+from button import Button  # Pushbutton
+from rotary_encoder import RotaryEncoder
+
 
 # local packages
-from ssd1331 import SSD1331  # OLED display
-from ade7816 import ADE7816  # Energy monitor
-from button import Button
 from spi import SPI_with_CS
-from rotary_encoder import RotaryEncoder
 from gui import GUI
-
-
+from namespace import Namespace
+from hass import HomeAssistant
+import menus
 
 class EEMON42:
     """ EEMON42 main application.
     """
 
-    topic_sub = b'notification'
-    topic_pub = b'home/sensor1/infojson'
+    # topic_sub = b'notification'
+    # topic_pub = b'home/sensor1/infojson'
 
-
+    CONFIG_FOLDER = '/config/'
 
     def __init__(self):
         """ Create EEMON42 hardware objects
         """
+        gc.collect()
 
         self.config = None
+        self.secrets = None
         self.spi = None
         self.display = None
         self.gui = None
         self.client = None # wifi client
         self.fatal_error = False
-        self.client_id = ubinascii.hexlify(machine.unique_id())  # too bad the bytes.hex() function is not supported.
-        self.station = None
+        self.client_id = machine.unique_id().hex()
+        self.nic = None
+        self.network_connected = asyncio.Event()
 
         self.message_interval = 5
-
+        self.screen_saver_timeout = 120
 
         print('Welcome to EEMON42')
         print('   Creating EEMON42 instance')
+
+        print('   Loading configuration file')
+        self.config = self.load_config('config.json')
+        self.secrets = self.load_config('secrets.json')
+
+        self.hass = HomeAssistant(
+            self.config, self.secrets, network_ready=self.network_connected
+        )
 
         self.irq_flag = ThreadSafeFlag()
         # Pin definitions
@@ -93,8 +112,10 @@ class EEMON42:
                 cs_inout_pins=emon_cs_pins  # these pins are set to mode=Pin.OUT during SPI transactions to prevent button operations to enable CS lines 
                 )
 
+        # gc.collect()
+
         # Display handler
-        self.display = SSD1331(spi=self.spi, cs_pin=self.pin_cs7_disp, cd_pin=self.pin_cd, res_pin=self.pin_res)
+        self.display = Display(spi=self.spi, cs_pin=self.pin_cs7_disp, cd_pin=self.pin_cd, res_pin=self.pin_res, fb=fb)
 
         self.counter = 0
 
@@ -112,29 +133,34 @@ class EEMON42:
             irq_wrapper=self.spi.get_irq, # provide a IRQ handler that is disabled during SPI transactions
             verbose=0)
 
-        # Create the 7 energy monitor handlers
-        self.emon = [ADE7816(spi=self.spi, cs_pin=cs_pin, irq_pin=self.pin_cs6_irq, irq_wrapper=self.spi.get_irq, index=ix) 
+        # Create the 7 energy monitor chip handlers
+        eemon_conf = self.config.setdefault('emon',[Namespace()]*len(emon_cs_pins)) # Create eemon entry if it does not exists
+        self.emon = [ADE7816(
+                        spi=self.spi, cs_pin=cs_pin, irq_pin=self.pin_cs6_irq, 
+                        irq_wrapper=self.spi.get_irq, 
+                        index=ix, 
+                        config=eemon_conf[ix]) 
                      for ix, cs_pin in enumerate(emon_cs_pins)]
 
         # Setup the ADE7816 IRQ line interrupt handler
         self.pin_cs6_irq.irq(handler=self.spi.get_irq(self.emon_irq_handler));
          
 
-
         # Create the GUI (display + buttons, menu system etc) handler
-        self.gui = GUI(self.display, self.rot_enc, self.button_rot, button_enter=self.button_a, button_esc=self.button_b, button_shift=self.button_c)
+        self.gui = GUI(
+            self.display, 
+            self.rot_enc, 
+            self.button_rot, button_enter=self.button_a, button_esc=self.button_b, button_shift=self.button_c)
 
-
-        print('   Loading configuration file')
-        if not self.load_config():
-            raise RuntimeError("Unable to load the configuration file")
         print('   Instantiation complete')
 
-
     def emon_irq_handler(self, pin):
-        if not pin.value():
+        """ IRQ handler to process changes on the EMON IRQ line 
+
+        This being called as an IRQ service call in micropython, only thread safe actions must be performed. 
+        """
+        if not pin.value(): # only set the event if the IRQ line went low
             self.irq_flag.set()
-        # pass
 
     def init(self):
         """ Initialize hardware
@@ -144,7 +170,7 @@ class EEMON42:
         """
         # Initialize display
         self.display.init()
-        self.display.print("EEMON42\r\nis\r\nthe\r\nbest\nof\nall", fg=self.display.YELLOW, font_size=5)
+        # self.display.print("EEMON42\r\nis\r\nthe\r\nbest\nof\nall", fg=self.display.YELLOW, font_size=5)
 
         # Initialize Energy Monitor ICs
 
@@ -153,127 +179,78 @@ class EEMON42:
         # time.sleep(1)
         # self.display.clear()
 
+        self.gui.init()
 
-
-    async def start_wifi_client(self):
-        """ Connect to the Wifi Access point
-
-        Todo: continuously test connection, and loop to attempt reconnection
-        """
+    async def wifi_connection(self):
+        """Connect to WiFi and signal ``network_connected`` for other tasks."""
+        print('Starting WiFi connection Task')
+        nic = network.WLAN(network.STA_IF)
+        nic.active(True)
+        nic.disconnect()
+        self.network_connected.clear()
+        self.nic = None
         try:
-            print(f'Starting WiFi connection')
-            station = network.WLAN(network.STA_IF)
-
-            if station.isconnected():
-                station.disconnect()
-
-            station.active(True)
-
-            ssid = self.config['ssid']
-            print(f"Waiting for WiFi connection to {ssid}")
-            station.connect(ssid, self.config['password'])
-
-            # Wait for connection to the AP
-            while not station.isconnected():
-                await asyncio.sleep(.3)
-
-            print('WiFi connection successful')
-            print(station.ifconfig())
-            self.station = station  # store wifi object, which signals wifi is ready
-            print('WiFi connection completed')
-        except Exception as e:
-            print(f'Wifi exception was raised: {e}')
-            raise
-
-    async def mqtt_connect_and_subscribe(self):
-
-
-        def sub_cb(topic, msg):
-            print((topic, msg))
-            if topic == b'notification' and msg == b'received':
-                print('ESP received hello message')
-
-
-        try:
-            print(f'Starting MQTT connection')
-            config = self.config
-
-            # Make sure wifi link is ready
-            while not self.station:
-                print('MQTT client waiting for WiFi connection')
+            while True:
+                if not nic.isconnected():
+                    if self.network_connected.is_set():
+                        print('WiFi disconnected')
+                    self.network_connected.clear()
+                    self.nic = None
+                    ssid = self.secrets['ssid']
+                    print(f"Waiting for WiFi connection to {ssid}")
+                    nic.connect(ssid, self.secrets['password'])
+                    while not nic.isconnected():
+                        await asyncio.sleep(0.3)
+                    print('WiFi connection successful')
+                    print(nic.ifconfig())
+                    self.nic = nic
+                    self.network_connected.set()
+                    print('WiFi connection completed')
                 await asyncio.sleep(1)
-            print(f'Creating MQTT object')
-
-            client = MQTTClient(self.client_id, 
-                config['mqtt_server'], 
-                user=config['mqtt_user'], 
-                password=config['mqtt_password'])
-            print('MQTT object created. Connecting...')
-            client.set_callback(sub_cb)
-            client.connect()
-            print('MQTT connection complete. Subscribing...')
-            client.subscribe(self.topic_sub)
-            print('Connected to %s MQTT broker, subscribed to %s topic' %
-                  (config['mqtt_server'], topic_sub))
-            self.client = client  # Store MQTT client object, which also indicates it is fully ready 
-        except Exception as e:
-            print(f'Error while connecting to MQTT server: {repr(e)}')
-            # self.fatal_error = True
+        except BaseException as e:
+            print(f'Exception on Wifi task: {e!r}')
             raise
-
-    async def process_mqtt_messages(self):
-        """ Continuously look for new data to send and sent it when available 
-        """
-        counter = 0
-        while True:
-            try:
-                counter += 1
-                if self.client: # don't do anything unless the MQTT client is up and running
-                    self.client.check_msg()  # what does that do? messages from server?
-                    msg = json.dumps({"counter": counter})
-                    self.client.publish(self.topic_pub, msg)
-                await asyncio.sleep(self.message_interval)
-            except OSError as e:
-                self.fatal_error = True
+        finally:
+            print('Wifi connection task has terminated')
+            self.network_connected.clear()
+            self.nic = None
+            nic.disconnect()
 
 
-    def restart_and_reconnect(self):
-        print('Failed to connect to MQTT broker. Reconnecting...')
-        time.sleep(10)
-        machine.reset()
-
-
-    def load_config(self):
+    def load_config(self, filename):
+        # If running on-board, always load the config from the '/config' folder, even if the current 
+        # working directory is elsewhere (e.g. folder ``/remote`` if we run through ``mpremote mount``)
+        # If running on a PC, use the source from the ``software`` folder even if we run from the folder ``sim`` 
+        filename = self.CONFIG_FOLDER + filename
         try:
-            with open('config.json') as json_file:
-                self.config = json.load(json_file)
-        except:
-            return False
-        return True
+            with open(filename) as json_file:
+                config = Namespace(json.load(json_file))
+        except OSError:
+            print(f'Configuration file "{filename} not found. Loading empty config')
+            config = Namespace()  # Create empty config
+        return config    
+
  
     def dispose(self):
         self.display.clear()
         self.spi.deinit()
         self.spi = None
 
-    async def screen_saver(self, timeout=10):
+    async def screen_saver(self, timeout=120):
+        print('Starting screen saver task')
         try:
             while True:
                 dt = int(time.time() - self.display.last_time) 
                 if dt > 2*timeout:
                     self.display.set_brightness(0) # turn off display
                 elif dt > timeout:
-                    # print(f'Setting brightness to {1} {dt=}')
                     self.display.set_brightness(1) # set minimum brightness
-                    # # self.display.clear()
-                    # b = max(0, int(16 - dt))
-                    # self.display.set_brightness(b)
-                # elif t > 0:
-                #     self.display.set_master_intensity(0)
                 await asyncio.sleep(1)
-        except Exception as e:
-            print(f'Exception in screen_saver: {e}')
-
+        except BaseException as e:
+            print(f'Exception in screen_saver: {e!r}')
+            raise
+        finally:
+            print('Screen saver task has terminated')
     async def watchdog(self): 
         """ Monitors the system status flags and reset the board if a fatal error is detected
         """
@@ -283,6 +260,7 @@ class EEMON42:
             await asyncio.sleep(1)
 
     async def scan_emon(self):
+        print('Starting EMON scanning task')
         dev = 0  # current energy monitor device number
         n_dev = len(self.emon) # total number of energy monitor devices
 
@@ -291,12 +269,14 @@ class EEMON42:
         irq_pin = self.pin_cs6_irq  
         irq_flag = self.irq_flag
         spi = self.spi
+        print(f'IRQ={self.pin_cs6_irq()}')
 
-        while True:
-            try:
+        try:
+            while True:
                 # If there is not already an IRQ, wait for the IRQ flag to be set by the pin interrupt, 
                 # but continue anyways after a timeout in case the IRQ pin went low without the interrupt being processed
-                if irq_pin():
+                if irq_pin(): # if no interrupt is pending
+                    # print(f'IRQ={irq_pin()}')
                     try:
                         await asyncio.wait_for(irq_flag.wait(), 13)
                         irq_flag.clear()
@@ -310,43 +290,83 @@ class EEMON42:
                     if dev >= n_dev: 
                         dev = 0
                     scanned_dev += 1
-                    await asyncio.sleep(0)  # be a good neighbor and give back control to the event loop to let the UI respond to user actions 
+                    # print(f'{dev=} {scanned_dev=}')
+                    await asyncio.sleep(0.01)  # be a good neighbor and give back control to the event loop to let the UI respond to user actions 
                 # print('---')
                 # await asyncio.sleep(0.1)
-            except Exception as e:
-                print(f'scan_emon exception {e}')
-                raise
-    async def main_loop(self):
+        except BaseException as e:
+            print(f'Exception in EMON scanning: {e!r}')
+            raise
+        finally:
+            print('EMON scanning task has terminated')
+
+    async def publish_task(self):
+        """Publish dummy sensor readings to Home Assistant (placeholder for EMON telemetry)."""
+        entity_id = 'sensor.eemon42_dummy'
+        value = 0
+        print('Starting Home Assistant publish task')
+        try:
+            while True:
+                await self.network_connected.wait()
+                value += 1
+                try:
+                    await self.hass.set_state(
+                        entity_id,
+                        value,
+                        {'unit_of_measurement': 'W', 'friendly_name': 'EEMON42 dummy'},
+                    )
+                except OSError as e:
+                    print(f'Home Assistant publish failed: {e!r}')
+                await asyncio.sleep(3)
+        except asyncio.CancelledError:
+            raise
+        finally:
+            print('Home Assistant publish task has terminated')
+
+    async def main_loop(self, extra_tasks = tuple()):
 
         self.init()
 
         print('Starting main loop')
 
         # Start background tasks
-        print('Starting background tasks')
+        # print('Starting background tasks')
         task_list = (
-            self.screen_saver(timeout=10), # turn off the display after `timeout`
+            self.screen_saver(timeout=self.screen_saver_timeout), # turn off the display after `timeout`
             self.scan_emon(),
             # self.watchdog(), # reboots if there is a fatal error
-            # self.start_wifi_client(), # connect wifi
+            self.wifi_connection(), # connect wifi
+            self.hass.run(),
+            self.publish_task(),
             # self.mqtt_connect_and_subscribe(), # connects MQTT client when wifi is up
             # self.process_mqtt_messages() # sends MQTT messages when MQTT client is connected
+            menus.run_main_menu(self.gui, app=self),
             );
-        tasks = [asyncio.create_task(t) for t in task_list]
-
-        # Start GUI
-        print('Starting GUI')
+        tasks = tuple(asyncio.create_task(t) for t in task_list) + extra_tasks
         try:
-            await self.gui.run()  # run the GUI
-        finally:
-            # make sure we cancel all background tasks when exiting
-            for t in tasks:
-                t.cancel()
-            self.dispose()
+            print('Starting all background tasks')
+            results = await asyncio.gather(*tasks, return_exceptions=False)  # return_exceptions=False: will raise an exception as soon as one of the tasks raise one (other tasks won't be cancelled)
+        except (KeyboardInterrupt, asyncio.CancelledError):
+            print(f'Main loop interrupted by user')
+ 
+        # make sure we cancel all background tasks when exiting
+        for t in tasks:
+            t.cancel()
+        # Wait until all task are completed 
+        # return_exceptions=True: Will return only when all tasks are done, with or without exceptions. The ones that had not already failed should stop due to the cancellation. 
+        await asyncio.gather(*tasks, return_exceptions=True) 
+        print('Disposing EEMON42 resources...')
+        self.dispose()
         print('Exiting main loop')
  
     def run(self):
         try:
-            asyncio.run(self.main_loop())
-        except KeyboardInterrupt:
+            asyncio.run(self.main_loop())  # Can't use the parameter debug in micropython
+        except (KeyboardInterrupt):
             print('Interrupted')
+        except:
+            raise
+# if __name__ == '__main__':
+#     e = EEMON42()
+#     d = e.display
+#     e.run()
