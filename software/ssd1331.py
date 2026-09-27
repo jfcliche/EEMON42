@@ -25,9 +25,9 @@ class SSD1331(Display):
     HEIGHT = 64
     BYTES_PER_PIXEL = 2
 
-    def __init__(self, spi, cs_pin, cd_pin, res_pin):
+    def __init__(self, spi, cs_pin, cd_pin, res_pin, fb=None):
 
-        super().__init__()
+        super().__init__(fb=fb)
         self.spi = spi
         self.cs_pin = cs_pin
         self.cd_pin = cd_pin
@@ -107,7 +107,7 @@ class SSD1331(Display):
         self.cd_pin(1)
         self.spi.exchange(self.cs_pin, data)
 
-    def write_frame_buffer(self, y0=None, y1=None):
+    def update(self):
         """ Sends the specified lines of the frame buffer to the hardware display. 
 
         If no lines are specified, only the block of lines that were modified since the last call are updated. 
@@ -118,10 +118,10 @@ class SSD1331(Display):
 
         """
         # sets the window
-        self.cmd[4] = y0 = y0 if y0 is not None else self.fb_y0
-        self.cmd[5] = y1 = y1 if y1 is not None else self.fb_y1
+        self.cmd[5] = y1 = self.fb_y1
         if y1 < 0:
             return
+        self.cmd[4] = y0 = self.fb_y0
         with self.spi:
             self._write_command(self.cmd) # send the window command
             self._write_data(self.fb[y0 * self.BYTES_PER_LINE: (y1+1) * self.BYTES_PER_LINE]) # fb is a memoryview, indexing does not allocate new memory
