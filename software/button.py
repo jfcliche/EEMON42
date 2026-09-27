@@ -50,7 +50,7 @@ class Button:
         v = pin.value() # get button state ASAP
         t = time.ticks_ms()
         # if verbose:
-        #     print(f'Button {pin}= {self.last_state}->{v} dt0={time.ticks_diff(t, self.last_time)}')
+        print(f'Button {pin}= {self.last_state}->{v} dt0={time.ticks_diff(t, self.last_time)}')
         # Ignore pin state changes if we are in the bounce rejecting window
         if time.ticks_diff(t, self.last_time) > self.delay:
             # if we detect a pin value change compared to the latest known state, restart the bounce reject window, check if it is a button-down event, and store the new button state. 
