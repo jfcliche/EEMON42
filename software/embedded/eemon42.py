@@ -1,4 +1,40 @@
+import network
+import time
+
+def heap_info():
+    import gc
+    gc.collect()
+    print("Python heap free:", gc.mem_free())
+    try:
+        import esp32
+        print("IDF heap:", esp32.idf_heap_info(esp32.HEAP_DATA))
+    except ImportError:
+        pass
+print('heap_info() defined')
+heap_info()
+
+
+# Initialize WiFi client
+network.country("CA")  # ← required on ESP32-C3, prevents channel/region errors
+
+nic = network.WLAN(network.STA_IF)
+nic.active(False)       # ← force clean state (fixes 0x0102 on many C3 boards)
+nic.active(True)
+time.sleep(0.8)         # ← let the driver finish initializing
+# nic.config(txpower=14)  # ← lower TX power (fixes RF issues on C3)nic.active(True)
+nic.config(txpower=5)
+nic.config(pm=nic.PM_NONE)
+nic.connect('igloot', 'fifafoiot')
+while not nic.isconnected():
+    time.sleep(0.1)
+print(nic.ifconfig())
+# nic.disconnect()
+# network_connected.clear()
+
+
+import os
 import sys
+
 is_micropython = sys.implementation.name == 'micropython'
 
 # from ssd1331 import SSD1331 as Display  # 96x64 OLED display
@@ -13,6 +49,7 @@ import time
 import machine
 import network
 import json
+
 
 import asyncio
 import gc
@@ -35,6 +72,8 @@ from namespace import Namespace
 from hass import HomeAssistant
 import menus
 
+
+
 class EEMON42:
     """ EEMON42 main application.
     """
@@ -42,7 +81,9 @@ class EEMON42:
     # topic_sub = b'notification'
     # topic_pub = b'home/sensor1/infojson'
 
-    CONFIG_FOLDER = '/config/'
+    CONFIG_FOLDER = '/config'
+    # SECRETS_FOLDER = os.path.dirname(os.path.abspath(__file__))  # os.path not supported in micropython
+    SECRETS_FOLDER = '.'
 
     def __init__(self):
         """ Create EEMON42 hardware objects
@@ -66,9 +107,23 @@ class EEMON42:
         print('Welcome to EEMON42')
         print('   Creating EEMON42 instance')
 
+        heap_info()
+
         print('   Loading configuration file')
-        self.config = self.load_config('config.json')
-        self.secrets = self.load_config('secrets.json')
+        self.config = self.load_config(self.CONFIG_FOLDER + '/config.json')
+        self.secrets = self.load_config(self.SECRETS_FOLDER + '/secrets.json')
+
+        print('   Connecting wifi')
+
+        heap_info()
+
+        # # Initialize WiFi client
+        # self.nic = network.WLAN(network.STA_IF)
+        # self.nic.active(True)
+        # self.nic.disconnect()
+        # self.network_connected.clear()
+
+        self.nic = nic
 
         self.hass = HomeAssistant(
             self.config, self.secrets, network_ready=self.network_connected
@@ -184,26 +239,31 @@ class EEMON42:
     async def wifi_connection(self):
         """Connect to WiFi and signal ``network_connected`` for other tasks."""
         print('Starting WiFi connection Task')
-        nic = network.WLAN(network.STA_IF)
-        nic.active(True)
-        nic.disconnect()
-        self.network_connected.clear()
-        self.nic = None
+
+
+        # self.nic = network.WLAN(network.STA_IF)
+        # self.nic.active(True)
+        # self.nic.disconnect()
+        # self.network_connected.clear()
+        # nic = self.nic
         try:
             while True:
-                if not nic.isconnected():
+                if not self.nic.isconnected():
                     if self.network_connected.is_set():
                         print('WiFi disconnected')
                     self.network_connected.clear()
-                    self.nic = None
+                    # self.nic = None
                     ssid = self.secrets['ssid']
+                    password = self.secrets['password']
                     print(f"Waiting for WiFi connection to {ssid}")
-                    nic.connect(ssid, self.secrets['password'])
-                    while not nic.isconnected():
+                    self.nic.active(False)
+                    self.nic.active(True)
+                 
+                    self.nic.connect(ssid, password)
+                    while not self.nic.isconnected():
                         await asyncio.sleep(0.3)
                     print('WiFi connection successful')
-                    print(nic.ifconfig())
-                    self.nic = nic
+                    print(self.nic.ifconfig())
                     self.network_connected.set()
                     print('WiFi connection completed')
                 await asyncio.sleep(1)
@@ -220,8 +280,7 @@ class EEMON42:
     def load_config(self, filename):
         # If running on-board, always load the config from the '/config' folder, even if the current 
         # working directory is elsewhere (e.g. folder ``/remote`` if we run through ``mpremote mount``)
-        # If running on a PC, use the source from the ``software`` folder even if we run from the folder ``sim`` 
-        filename = self.CONFIG_FOLDER + filename
+        # If running on a PC, use ``software/embedded`` (see sim ``CONFIG_FOLDER``).
         try:
             with open(filename) as json_file:
                 config = Namespace(json.load(json_file))

@@ -11,12 +11,15 @@ requires-python = ">=3.10"
 # vendored helpers (e.g. umqttsimple.py). No PyPI packages are required on the MCU.
 dependencies = [
     "pygame>=2.5",  # packeged is installed on computer only
+    "rshell",
+    "esptool"
 ]
 
 
-[tool.setuptools]
-# Flat module layout for on-device deployment; not installed as a Python package on the MCU.
-packages = ["homeassistant"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["embedded*"]
+namespaces = false
 
 [tool.setuptools.package-dir]
 "" = "."

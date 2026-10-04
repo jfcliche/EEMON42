@@ -1,4 +1,4 @@
-from software.ade7816 import ADE7816 as ADE7816_HW
+from embedded.ade7816 import ADE7816 as ADE7816_HW
 
 
 class ADE7816(ADE7816_HW):

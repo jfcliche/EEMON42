@@ -107,7 +107,7 @@ class SSD1331(Display):
         self.cd_pin(1)
         self.spi.exchange(self.cs_pin, data)
 
-    def update(self):
+    def _update(self, y0, y1):
         """ Sends the specified lines of the frame buffer to the hardware display. 
 
         If no lines are specified, only the block of lines that were modified since the last call are updated. 
@@ -118,22 +118,12 @@ class SSD1331(Display):
 
         """
         # sets the window
-        self.cmd[5] = y1 = self.fb_y1
-        if y1 < 0:
-            return
-        self.cmd[4] = y0 = self.fb_y0
+        self.cmd[5] = y1
+        self.cmd[4] = y0
         with self.spi:
             self._write_command(self.cmd) # send the window command
             self._write_data(self.fb[y0 * self.BYTES_PER_LINE: (y1+1) * self.BYTES_PER_LINE]) # fb is a memoryview, indexing does not allocate new memory
-        self.fb_y0 = self.HEIGHT - 1
-        self.fb_y1 = -1 # -1 is faster to check than y0 > y1
-
-        # tb = time.ticks_cpu()
-        # t1 = time.ticks_ms()
-        # self.write_frame_buffer(y, y+7)
-        # t2= time.ticks_ms()
-        # print(f'draw={t1-t0} ms, refresh={t2-t1} ms, buf access={tb-ta} cycles')
-
+ 
     def display_on(self):
         self.write_command((0xAF,))
 

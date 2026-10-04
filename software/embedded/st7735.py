@@ -25,56 +25,7 @@ class ST7735(Display):
     HEIGHT = 160
     BYTES_PER_PIXEL = 2
 
-    # Registers
-    # NOP = 0x0
-    # SWRESET = 0x01
-    # RDDID = 0x04
-    # RDDST = 0x09
-
-    # SLPIN  = 0x10
-    # SLPOUT  = 0x11
-    # PTLON  = 0x12
-    # NORON  = 0x13
-
-    # INVOFF = 0x20
-    # INVON = 0x21
-    # DISPOFF = 0x28
-    # DISPON = 0x29
-    # CASET = 0x2A
-    # RASET = 0x2B
-    # RAMWR = 0x2C
-    # RAMRD = 0x2E
-
-    # VSCRDEF = 0x33
-    # VSCSAD = 0x37
-
-    # COLMOD = 0x3A
-    # MADCTL = 0x36
-
-    # FRMCTR1 = 0xB1
-    # FRMCTR2 = 0xB2
-    # FRMCTR3 = 0xB3
-    # INVCTR = 0xB4
-    # DISSET5 = 0xB6
-
-    # PWCTR1 = 0xC0
-    # PWCTR2 = 0xC1
-    # PWCTR3 = 0xC2
-    # PWCTR4 = 0xC3
-    # PWCTR5 = 0xC4
-    # VMCTR1 = 0xC5
-
-    # RDID1 = 0xDA
-    # RDID2 = 0xDB
-    # RDID3 = 0xDC
-    # RDID4 = 0xDD
-
-    # PWCTR6 = 0xFC
-
-    # GMCTRP1 = 0xE0
-    # GMCTRN1 = 0xE1
-
-
+ 
     # Registers
     NOP = 0x00
     SWRESET = 0x01
@@ -139,105 +90,135 @@ class ST7735(Display):
         """ Initializes the display controller to the desired display mode
         """
         self.reset()
-        # self.write_command((
-        #     0xAE,        # Display off
-        #     # Seg remap = 0b01110010 A[7:6]=01:64k color, A[5]=1 COM splip odd-even, A[4]=1 Scan com, A[3]=0, A[2]=0, A[1]=1, A[0]=0
-        #     0xA0, 0b01100000,
-        #     0xA1, 0x00,  # Set Display start line
-        #     0xA2, 0x00,  # Set display offset
-        #     0xA4,        # Normal display
-        #     0xA8, 0x3F,  # Set multiplex
-        #     0xAD, 0x8E,  # Master configure
-        #     0xB0, 0x0B,  # Power save mode
-        #     0xB1, 0x74,  # Phase12 period
-        #     0xB3, 0xD0,  # Clock divider
-        #     0x8A, 0x80,  # Set precharge speed A
-        #     0x8B, 0x80,  # Set precharge speed B
-        #     0x8C, 0x80,  # Set precharge speed C
-        #     0xBB, 0x3E,  # Set pre-charge voltage
-        #     0xBE, 0x3E,  # Set voltage
-        #     0x87, 15))  # Master current control 1 = dim= 35mA, 15=bright=113mA
-        # self.write_command((0xAF,))  # display ON
-
-        # self.write_command((0x26, 1))  # Enable rectangle fill
+        time.sleep(.150)
 
         self.send_command(self.SWRESET)    # Software reset
-        time.sleep(0.150)               # delay 150 ms
+        time.sleep(0.150)               # delay 150 ms. Datasheet days to wait 120 ms.
 
         self.send_command(self.SLPOUT)     # Out of sleep mode
-        time.sleep(0.500)               # delay 500 ms
+        time.sleep(0.150)               # delay 500 ms. Datasheet says to wait 120 ms.
 
-        # Frame rate ctrl - normal mode
+        print('Out of sleep mode')
+        self.send_command(self.COLMOD, b'\x05')     # set color mode
+        # byte 1: 0x05                 # 16-bit color
+
+        # Frame rate ctrl - normal mode (full color)
+        #   Byte 1: RTNA 1-line period
+        #   Byte 2: FPA: front porch, 
+        #   Byte 3: BPA: back porch
         # Rate = fosc/(1x2+40) * (LINE+2C+2D)
-        self.send_command(self.FRMCTR1, (0x01, 0x2c, 0x2d))    # (RTNA 1-line period, FPA: front porch, BPA: back porch)
+        self.send_command(self.FRMCTR1, b'\x00\x06\x03')  # '\x01\x2c\x2d' for red tab'    
 
-        # Frame rate ctrl - idle mode
-        # Rate = fosc/(1x2+40) * (LINE+2C+2D)
-        self.send_command(self.FRMCTR2, (0x01, 0x2c, 0x2d))    # Frame rate ctrl - idle mode
+        # *** debug
+        # # Frame rate ctrl - idle mode (8-colors)
+        # # Rate = fosc/(1x2+40) * (LINE+2C+2D)
+        self.send_command(self.FRMCTR2, b'\x00\x06\x03' )    # Frame rate ctrl - idle mode
+        # was (0x01, 0x2c, 0x2d)
 
-        # Frame rate ctrl - partial mode / full color
-        # ( Dot inversion mode, _, _, Line inversion mode, _ , _)
-        self.send_command(self.FRMCTR3, (0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d) )    
+        # *** debug
+        # # Frame rate ctrl - partial mode + full color
+        # # ( Dot inversion mode, _, _, Line inversion mode, _ , _)
+        self.send_command(self.FRMCTR3, b'\x00\x06\x03\x00\x06\x03' )    
+        #was (0x01, 0x2c, 0x2d, 0x01, 0x2c, 0x2d)
+
+        # Memory access control (directions)
+        #   Byte 1: row addr/col addr, bottom to top refresh; RGB/BGR encoding
+        #       Bit 7: MY: Row address order
+        #       Bit 6: MX: Column address order
+        #       Bit 5: MV: Row/column exchange
+        #       Bit 4: ML: Vertical refresh order; 0=top to bot, 1= Bot to Top
+        #       Bit 3: RGB: RGB-BGR order; 0=RGB, 1=BGR
+        #       Bit 2: MH: Horizontal refesh order; 0=Lest to Right, 1= Right to Left 
+        self.send_command(self.MADCTL, b'\x00')     
+            #0xC8,))            # row addr/col addr, bottom to top refresh; Set D3 RGB Bit to 1 for format BGR
+            # 0xC0,))             # row addr/col addr, bottom to top refresh; Set D3 RGB Bit to 0 for format RGB
+
+        # Display settings
+        #   Byte 1: NO, SDT (source delay), EQ (EQ period). 0x15 = 1 clk nonoverlap, 2 cycle gate rise, 3 cyc osc, equualize.
+        #   Byte 2: PTG, PT (Display area source/VCOM/Gate output control) 0x02: Fix on VTL
+        self.send_command(self.DISSET5, b'\x15\x02')    # ( 1 clk cycle nonoverlap, fix on VTL)
 
         # Display inversion ctrl
-        self.send_command(self.INVCTR, (0x07,)) # No inversion     
+        #   Byte 1: NL
+        self.send_command(self.INVCTR, b'\x07') # No inversion  . 'b\07' for red tab   
 
-        
-        self.send_command(self.PWCTR1, (  # Power control
-            0xA2,
-            0x02,                 # -4.6V
-            0x84))                 # auto mode
+        # Power control 
+        #   Byte 1: VRH
+        #   Byte 2: IB-SEL
+        self.send_command(self.PWCTR1, b'\x02\x70')  # Power control (4.7V, 1uA) (b'\xA2\x02\x84' for ST7735S)
 
-        self.send_command(self.PWCTR2, (     # Power control
-            0x0A,                 # Opamp current small
-            0x00))                 # Boost frequency
+        # Power control
+        #   Byte 1: BT (sets VGH/VGL voltage)
+        self.send_command(self.PWCTR2, b'\x05')     # Power control (VGH=14.7V, VGL=-7.35V)
+            # 0x0A,                 # Opamp current small
+            # 0x00))                 # Boost frequency
 
-        self.send_command(self.PWCTR4,(     # Power control
-            0x8A,                 # BCLK/2, Opamp current small & Medium low
-            0x2A))
+        # Power control in normal mode (full colors)
+        #   Byte 1: APA (opamp adjust)
+        #   Byte 2: DCA (booster voltage)
+        self.send_command(self.PWCTR3, b'\x01\x02') # Opamp current small, Boost frequency
 
-        self.send_command(self.PWCTR5, (     # Power control
-            0x8A,
-            0xEE))
+        # Power control in idle mode (8 colors)
+        # self.send_command(self.PWCTR4,(     # Power control
+        #     0x8A,                 # BCLK/2, Opamp current small & Medium low
+        #     0x2A))
 
-        self.send_command(self.VMCTR1, ( # Power control 
-            0x0E,))    
+        # Power control in partial mode (Full colors)
+        # self.send_command(self.PWCTR5, (     # Power control
+        #     0x8A,
+        #     0xEE))
+
+
+        # VCOM control
+        #   Byte 1: VMH (VCOMH voltage)
+        #   Byte 2: VML (VCOML voltage)
+        self.send_command(self.VMCTR1, b'\x3c\x38')  # VCOMH = 4V, VCOML= -1.1V 
+
+        # Power control in partial mode + Idle
+        #   Byte 1: Sapa, Sapb
+        #   Byte 2: Sapc, DCD
+        self.send_command(self.PWCTR6, b'\x11\x15')  # VCOMH = 4V, VCOML= -1.1V 
+
+
+
+
+
+        # Set Gamma
+        # Bytes 1-16: Gamma adjustment + polarity
+        self.send_command(self.GMCTRP1, b'\x02\x1c\x07\x12\x37\x32\x29\x2d\x29\x25\x2B\x39\x00\x01\x03\x10')         
+
+        # Set Gamma    
+        # Bytes 1-16: Gamma adjustment - polarity
+        self.send_command(self.GMCTRN1, b'\x03\x1d\x07\x06\x2E\x2C\x29\x2D\x2E\x2E\x37\x3F\x00\x00\x02\x10') 
+
+        # Column addr set
+        # Bytes 1-2: 16-bit X addr start (big endian) 
+        # Bytes 3-4: 16-bit X addr end (big endian) 
+        x0 = 2
+        x1 = x0 + self.WIDTH -1
+        self.send_command(self.CASET, ((x0 << 16) + x1).to_bytes(4, 'big'))     
+
+        # Row addr set
+        # Bytes 1-2: 16-bit Y addr start (big endian) 
+        # Bytes 3-4: 16-bit Y addr end (big endian) 
+        y0 = 1
+        y1 = y0 + self.HEIGHT -1
+        self.send_command(self.RASET, ((y0 << 16) + y1).to_bytes(4, 'big'))     
+   
             
 
         self.send_command(self.INVOFF)  # Don't invert display
 
-        self.send_command(self.MADCTL, (     # Memory access control (directions)
-            #0xC8,))            # row addr/col addr, bottom to top refresh; Set D3 RGB Bit to 1 for format BGR
-            0xC0,))             # row addr/col addr, bottom to top refresh; Set D3 RGB Bit to 0 for format RGB
 
-        self.send_command(self.COLMOD, (     # set color mode
-            0x05))                 # 16-bit color
 
-        self.send_command(self.CASET, (      # Column addr set
-            0x00,                 # XSTART = 0
-            0,                   # offset left
-            0x00,                 # XEND = ROWS - height
-            self.WIDTH + 0 - 1))   # offset right
-
-        self.send_command(self.RASET, (      # Row addr set
-            0x00,                 # XSTART = 0
-            0, # offset top
-            0x00,                 # XEND = COLS - width
-            self.HEIGHT + 0 -1 )) # offset bottom
-
-        self.send_command(self.GMCTRP1, (    # Set Gamma
-            0x02, 0x1c, 0x07, 0x12, 0x37, 0x32,
-            0x29, 0x2d, 0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10))         
-            
-        self.send_command(self.GMCTRN1, (    # Set Gamma
-            0x03, 0x1d, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D, 0x2E,
-            0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10)) 
+ 
+        # self.send_command(self.SLPOUT)      
 
         self.send_command(self.NORON)      # Normal display on
         time.sleep(0.010)                # 10 ms
 
         self.send_command(self.DISPON)
-        time.sleep(0.100)               # 100 ms
+        time.sleep(0.100)               # 100 ms. Datasheet says 120ms vefore DISPOFF
 
         super().init()
 
@@ -251,7 +232,7 @@ class ST7735(Display):
         time.sleep(0.01)
         # All the display needs to be refreshed
         self.fb_y0 = 0
-        self.fb_y1 = 63
+        self.fb_y1 = self.HEIGHT - 1
 
     def send_command(self, cmd, data=None):
         """ Sends 1-byte command followed by its arguments
@@ -267,10 +248,10 @@ class ST7735(Display):
         self.spi.exchange(self.cs_pin, bytes((cmd,)))
         if data:
             self.cd_pin(1)
-            if isinstance(data, memoryview):
-                self.spi.exchange(self.cs_pin, data)
+            if isinstance(data, (memoryview, bytes, bytearray)):
+                return self.spi.exchange(self.cs_pin, data)
             else:
-                self.spi.exchange(self.cs_pin, bytearray(data))
+                return self.spi.exchange(self.cs_pin, bytearray(data))
 
     # def _write_command(self, data):
     #     """ Writes data bytes
@@ -282,9 +263,9 @@ class ST7735(Display):
     #     self.cd_pin(0)
     #     self.spi.exchange(self.cs_pin, data)
 
-    def write_data(self, data):
-        self.cd_pin(1)
-        self.spi.exchange(self.cs_pin, bytearray(data))
+    # def write_data(self, data):
+    #     self.cd_pin(1)
+    #     self.spi.exchange(self.cs_pin, bytearray(data))
 
     # def _write_data(self, data):
     #     """ Assumes data is already a bytearray or buffer"""
@@ -305,7 +286,7 @@ class ST7735(Display):
             self.display_on()
             # self.send_command((0xAF, 0x87, min(15, brightness-1))) # dislay ON, set brightness
 
-    def update(self):
+    def _update(self, y0, y1):
         """ Sends the specified lines of the frame buffer to the hardware display. 
 
         If no lines are specified, only the block of lines that were modified since the last call are updated. 
@@ -316,19 +297,14 @@ class ST7735(Display):
 
         """
         # sets the window
-        y1 = self.fb_y1
-        if y1 < 0:
-            return
-        y0 = self.fb_y0
         with self.spi:
             # Column & row addr set
-            self.send_command(self.CASET, (0, 0, (self.WIDTH -1) >> 8, (self.WIDTH -1) & 0xFF))
-            self.send_command(self.RASET, (y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF))
+            # self.send_command(self.CASET, (0, 0, (self.WIDTH -1) >> 8, (self.WIDTH -1) & 0xFF))
+            self.send_command(self.RASET, (((y0+1) << 16) + y1 + 1).to_bytes(4, 'big'))
             # self.send_command(self.RAMWR)       # write to RAM
             # Send the frame buffer
+            # print(f'Sending lines {y0}-{y1}')
             self.send_command(self.RAMWR, self.fb[y0 * self.BYTES_PER_LINE: (y1+1) * self.BYTES_PER_LINE]) # fb is a memoryview, indexing does not allocate new memory
-        self.fb_y0 = self.HEIGHT - 1
-        self.fb_y1 = -1 # -1 is faster to check than y0 > y1
 
  
     # def set_window(self, x1, y1, x2, y2):

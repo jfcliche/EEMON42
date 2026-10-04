@@ -492,7 +492,7 @@ class Menu:
                         await self.run_edit_box()
                         self.draw()
                         continue
-                    elif isinstance(lims, tuple): # non editable field with tuple
+                    elif isinstance(field_params, tuple): # non editable field with tuple
                         meth, kwargs = field_params
                         v = await meth(**kwargs, **self.kwargs)
                         self.draw(clear=True)

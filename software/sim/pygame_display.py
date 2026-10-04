@@ -11,11 +11,7 @@ class PygameDisplay:
         self.surface = pygame.surface.Surface((self.WIDTH, self.HEIGHT))
         self._sim_brightness = 0
 
-    def update(self):
-        y1 = self.fb_y1
-        if y1 < 0:
-            return
-        y0 = self.fb_y0
+    def _update(self, y0, y1):
         br = self._sim_brightness
         for y in range(y0, y1 + 1):
             a = y * self.BYTES_PER_LINE
@@ -25,8 +21,6 @@ class PygameDisplay:
                 b = (self.fb[a + 1] & 0b11111) << 3
                 self.surface.set_at((x, y), (r * br, g * br, b * br))
                 a += 2
-        self.fb_y0 = self.HEIGHT - 1
-        self.fb_y1 = -1
 
     def _set_brightness(self, brightness):
         if not brightness:

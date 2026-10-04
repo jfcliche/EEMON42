@@ -27,7 +27,15 @@ CC = chr(31) # clear color
 
 class Display:
     """ Frame buffer for R5G5B5 displays. 
-  
+
+    The frame buffer ``self.fb`` is a memoryview of a bytearray of size ``self.WIDTH * self.HEIGHT * self.BYTES_PER_PIXEL``. It covers the whole display area. Data is stored in the display native format, i.e. R5G6B5 for 16-bit displays.
+
+    Some optimizations:
+
+    - fb_y0 and fb_y1 are the current lowest and highest modified lines in the frame buffer. These grow as we perform writes in the display, and indicate which lines need to be updated so we don't have to update the whole display. This is reset when we call update(), which sends the dirty lines to the display.
+    - We always refresh a whole line at a time. This allows us to refresh multiple lines in a single serial command. We don't take advantage of the windowing feature (configurable autowrap)  of some displays yet, which would allow to refresh only between columns. 
+      This would require extra housekeeping to keep track of the modified columns, and might not be worth the effort. For small displays, what we have is fast enough.
+    - cl_y0 and cl_y1 keep track of which lines have been uncleared on the display. This allows us to not have to write the whole display with zeros when a clear() command is issue and large portions of the display have never been touched since the last clear. These grow with update() and are reset by clear().
     """
     # Display geometry
     WIDTH = None
@@ -47,7 +55,7 @@ class Display:
 
     def __init__(self, fb=None):
         self.BYTES_PER_LINE = self.WIDTH * self.BYTES_PER_PIXEL
-
+        self.HEIGHT_MINUS_1 = self.HEIGHT - 1
         # initialize the frame buffer if one is not alreadyprovided
         if fb:
             self.fb  =fb
@@ -56,13 +64,14 @@ class Display:
 
         self.zeros = memoryview(bytearray(self.BYTES_PER_LINE)) # preallocate a line of zeros for efficiency
 
-
-        self.fb_y0 = 0  # current lowest modified frame buffer line
-        self.fb_y1 = self.HEIGHT-1  # current highest modified frame buffer line
-        self.cl_y0 = 0
-        self.cl_y1 = self.HEIGHT-1
+        # fb_y0/1: frame buffer lines that has been set since the last update (grows with draw operations, cleared with update())
+        self.fb_y0, self.fb_y1 = (0, self.HEIGHT_MINUS_1)  
+        # cl_y0/1: *display* lines that have been set since last clear (grows with fb during update(), cleared by clear())
+        self.cl_y0, self.cl_y1 = (0, self.HEIGHT_MINUS_1)  
+        self._update_all = False  # Forces update() to update all the dirty lines in addition to the the dirty framebuffer lines. Used by clear() for clearing the display 
 
         self.brightness = 0 # dim level: 0= display off, 1: min brightness, 16: max brightness
+
         self.last_time = time.time()
 
         # current font information
@@ -94,7 +103,18 @@ class Display:
 
             This method should be provided by the hardware-specific subclass.
         """ 
-        raise NotImplementedError()
+        # Expand display dirty zone to include the new framebuffer lines
+        if self.fb_y0 < self.cl_y0:
+            self.cl_y0 = self.fb_y0
+        if self.fb_y1 > self.cl_y1:
+            self.cl_y1 = self.fb_y1
+        y0, y1 = (self.cl_y0, self.cl_y1) if self._update_all else (self.fb_y0,self.fb_y1)
+        if y1 >= 0:
+            self._update(y0, y1)
+        if self._update_all:
+            self.cl_y0, self.cl_y1 = (self.fb_y0, self.fb_y1)
+        self.fb_y0, self.fb_y1 = (self.HEIGHT_MINUS_1,-1) # null range
+        self._update_all = False
 
     def _set_brightness(self, brightness):
         """ Set the brightness of the display.
@@ -113,25 +133,36 @@ class Display:
     #     self.write_frame_buffer(y0=y0, y1=y1)
 
     def clear(self, update=False, force=False):
-        fb = self.fb
-        if force:
-            self.fb_y0 = 0
-            self.fb_y1 = self.HEIGHT - 1
-        else:
-            self.fb_y0 = self.cl_y0
-            self.fb_y1 = self.cl_y1
-            if self.cl_y1 < 0:
-                return
+        """ Clears the frame buffer.
 
-        addr = self.fb_y0 * self.BYTES_PER_LINE
-        for j in range(self.fb_y1 - self.fb_y0 + 1):
-            fb[addr: addr + self.BYTES_PER_LINE] = self.zeros
-            addr += self.BYTES_PER_LINE
+        Parameters:
+            update (bool): if True, the frame buffer is sent to the display after the frame buffer memory is cleared.
+            force (bool): if True, the whole display is cleared, otherwise only the lines that have been uncleared since the last clear are cleared.
+        """
+        fb = self.fb
+
+        # Clear the frame buffer
+        if force: # force clearing whe whole framebuffer
+            y0 = 0
+            y1 = self.HEIGHT - 1
+        else: # clear only the framebuffer lines that have been written since the last clear (those that were tracked by update() (cl_y) + those that haven't been updated yet (fb_y)).
+            y0 = min(self.cl_y0, self.fb_y0)
+            y1 = max(self.cl_y1, self.fb_y1)
+
+        if y1 >= 0: # if there are framebuffer lines to clear
+            addr = y0 * self.BYTES_PER_LINE
+            for j in range(y1 - y0 + 1):
+                fb[addr: addr + self.BYTES_PER_LINE] = self.zeros
+                addr += self.BYTES_PER_LINE
+
+        # Clear text pointers
         self.text_x = self.text_y = 0
+
+        # Setup next update to update the whole display dirty window
+        self._update_all = True
+
         if update:
             self.update()
-        self.cl_y0 = self.HEIGHT - 1
-        self.cl_y1 = -1
 
     def fill(self, x0, y0, x1, y1, color, update=False):
         fb = self.fb

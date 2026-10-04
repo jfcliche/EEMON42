@@ -1,30 +1,23 @@
-#!/usr/bin/env python 
+#!/usr/bin/env -S uv run
 
 import sys
 import os
-import time
-import asyncio
 
-is_micropython = sys.implementation.name == 'micropython'
-
-# If we are not running micropython, we are presumably running on a computer, so se setup the python path for running simulated modules
-if not is_micropython:
-    _software_dir = os.path.dirname(os.path.abspath(__file__))
-    _root_dir = os.path.normpath(os.path.join(_software_dir, "..")) # include root dir to allow simulated modules to access embedded modules through absolute path imports
-    _sim_dir = os.path.normpath(os.path.join(_root_dir, "sim")) # sim dir modules will shadow the software dir modules
-    sys.path.insert(0, _sim_dir)
-    sys.path.insert(0, _root_dir)
+# If we are not running native micropython, enable the paths to the emulated modules
+if sys.implementation.name != 'micropython':
+    _embedded_dir = os.path.dirname(os.path.abspath(__file__))
+    _software_dir = os.path.normpath(os.path.join(_embedded_dir, "..")) 
+    _sim_dir = os.path.join(_software_dir, "sim")  
+    sys.path.insert(0, _sim_dir)  # sim dir modules will shadow the software dir modules
+    sys.path.insert(0, _software_dir)  # include root dir to allow simulated modules to access embedded modules through absolute path imports
+    print(f'{_sim_dir=}')
+    sys.pycache_prefix = os.path.join(_sim_dir, ".pycache")  #  put all .pyc in sim's .pycache so we don't pollute the embedded folder
     print('This is a ***simulated*** EEMON42')
-
 
 from eemon42 import EEMON42
 
-# import hass
-
 
 print(f'Running {os.getcwd()}/main.py')
-
-
 print('Hold button C while booting to start the GUI')
 
 print(f'Creating EEMON42 object from main')

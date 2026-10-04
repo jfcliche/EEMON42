@@ -1,5 +1,11 @@
-config.json
-/.idea
-/.vscode
+.idea
+.vscode
 __pycache__
-secrets.json
+.pycache
+.pyc
+.pyo
+.pyd
+.pyw
+.pyz
+.pywz
+.pyzw

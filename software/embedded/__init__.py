@@ -1,0 +1,1 @@
+# MicroPython on-device modules; on host, import as ``embedded.<module>`` with ``software/`` on sys.path.

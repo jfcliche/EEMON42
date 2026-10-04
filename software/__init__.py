@@ -1,1 +1,1 @@
-# This is needed to make the software directory a package we can access as hardware.<module> if the rood dir in in the python path
+# Project layout: ``embedded/`` (firmware), ``sim/`` (host shims). Host adds ``software/`` to sys.path.
